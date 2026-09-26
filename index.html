@@ -13,6 +13,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<script>
+  // Hell/Dunkel-Einstellung vor dem ersten Zeichnen setzen (kein Aufblitzen)
+  try { const t = (JSON.parse(localStorage.getItem('wetterwidget.opts')) || {}).theme;
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
 <style>
   :root {
     --bg: #f2f2f7;
@@ -47,8 +52,27 @@
     --cloud-mid: rgba(145,145,145,.85);
     --cloud-low: rgba(95,95,95,.9);
   }
+  :root { color-scheme: light; }
+  /* Dunkel: automatisch nach System (außer „Hell“ gewählt) oder fest über data-theme="dark" */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #000000;
+    --card: #1c1c1e;
+    --text: #f2f2f7;
+    --muted: #98989d;
+    --border: #38383a;
+    --input: #2c2c2e;
+    --accent: #0a84ff;
+    --shadow: none;
+    --weekend: rgba(120,160,230,.10);
+    --trend-line: #4a4f55;
+    --cell: #2c2c2e;
+    --drop: #6aa7ee;
+    --drop-edge: #9cc6ff;
+  }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #000000;
       --card: #1c1c1e;
       --text: #f2f2f7;
@@ -320,6 +344,10 @@
             <option value="kmh">km/h</option><option value="ms">m/s</option>
             <option value="bft">Beaufort (Bft)</option><option value="kn">Knoten (kn)</option>
           </select></label>
+        <label class="sel">Darstellung
+          <select id="theme">
+            <option value="auto">Automatisch (System)</option><option value="light">Hell</option><option value="dark">Dunkel</option>
+          </select></label>
         <label class="sel">Beim Start zeigen
           <select id="startLoc"></select></label>
       </div>
@@ -404,7 +432,7 @@
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
     opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true,
-      windUnit: 'kmh', start: 'last' }, store.get('opts') || {}),
+      windUnit: 'kmh', start: 'last', theme: 'auto' }, store.get('opts') || {}),
   };
 
   // Orte ohne Tide-Daten (Binnenland) merken, damit die Meeres-Anfrage dort entfällt
@@ -1410,6 +1438,21 @@
   $('reload').addEventListener('click', () => load(true)); // Knopf lädt auch das Ensemble neu
 
   // ---------- Einstellungen ----------
+  // Darstellung: automatisch / hell / dunkel; Browserleisten-Farbe passend setzen
+  function applyTheme() {
+    const t = state.opts.theme, root = document.documentElement;
+    if (t === 'light' || t === 'dark') root.dataset.theme = t; else delete root.dataset.theme;
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+      const forDark = m.media.includes('dark');
+      m.content = (t === 'dark' || (t === 'auto' && forDark)) ? '#000000' : '#f2f2f7';
+    });
+  }
+  applyTheme();
+  $('theme').value = state.opts.theme;
+  $('theme').addEventListener('change', () => {
+    state.opts.theme = $('theme').value; store.set('opts', state.opts);
+    applyTheme(); render(); renderEns();
+  });
   $('windUnit').value = state.opts.windUnit;
   $('windUnit').addEventListener('change', () => { state.opts.windUnit = $('windUnit').value; store.set('opts', state.opts); render(); });
   $('startLoc').addEventListener('change', () => { state.opts.start = $('startLoc').value; store.set('opts', state.opts); });
