@@ -255,7 +255,7 @@
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
-    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge. Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median; wird höchstens alle 12 h oder über ↻ neu geladen.
+    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge (quadratisch: kräftig nur bei viel Sonne). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median ab 1 mm; wird höchstens alle 12 h oder über ↻ neu geladen.
   </p>
 </main>
 
@@ -1068,7 +1068,7 @@
     const bw = Math.max(3, cw * 0.32);
     for (let j = 0; j < n; j++) {
       const r = ser.rain[j] || 0;
-      if (r >= 0.2) precipBar(svg, cx(j) - bw / 2, bw, HEAD + PH, PH - padT, r, snowWater(ser.snow ? ser.snow[j] : 0));
+      if (r >= (ser.minRain || 0.2)) precipBar(svg, cx(j) - bw / 2, bw, HEAD + PH, PH - padT, r, snowWater(ser.snow ? ser.snow[j] : 0));
     }
 
     const fs = small ? 12 : 15;
@@ -1086,7 +1086,7 @@
     for (let j = 0; j < n; j++) {
       const sunFrac = Math.min(1, (ser.sun[j] || 0) / daylight(ser.time[j]));
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: css('--cell') }, svg);
-      el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${sunFrac.toFixed(2)})` }, svg);
+      el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${(sunFrac * sunFrac).toFixed(2)})` }, svg); // quadratisch: nur wirklich sonnige Tage kräftig gelb
     }
     trendViews[id] = { n, cw, W, ser, daylight };
   }
@@ -1100,7 +1100,7 @@
   function renderEns() {
     if (!state.data || !state.ens) return;
     $('ensStatus').style.display = 'none';
-    drawTrend('ens', state.ens);
+    drawTrend('ens', { ...state.ens, minRain: 1 }); // Balken erst ab 1 mm Median (sonst Mini-Balken an meist trockenen Tagen)
   }
 
   function showTrendTip(id, ev) {
