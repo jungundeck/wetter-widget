@@ -26,7 +26,9 @@
     --weekend: rgba(90,130,190,.10);
     --trend-line: #c3cdd6;
     --cell: #ececec;
-    --sun: 245,215,40;                   /* Sonnenschein (RGB, Deckkraft = Anteil) */
+    --sun: 255,214,10;                   /* Sonnenschein (RGB, Deckkraft = Anteil) */
+    --snow: rgba(175,82,222,.45);        /* Schnee bis 5 mm Wasser */
+    --snow-strong: rgba(150,60,210,.92); /* Schnee-Anteil über 5 mm */
     --drop: #8dbdf5;
     --drop-edge: #3f76b8;
     --uv: #ffcc00;
@@ -91,6 +93,7 @@
   .trend { margin-top: 16px; }
   .trend h2 { font-size: 15px; font-weight: 600; margin: 0 4px 6px; }
   .trend h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .trend .bar { width: 5px; height: 12px; border-radius: 1px; display: inline-block; }
   .trend .band { width: 18px; height: 10px; border-radius: 2px; display: inline-block;
     background: linear-gradient(180deg, rgba(255,59,48,.18), rgba(0,122,255,.18)); }
   .trend .chart svg { cursor: default; }
@@ -206,7 +209,7 @@
       <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
       <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
       <span>☀︎ viel <i class="sunbar"></i> wenig</span>
-      <span>💧 Regen je Tag</span>
+      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee</span>
     </div>
   </section>
 
@@ -220,9 +223,9 @@
     <div class="legend">
       <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
       <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
-      <span><i class="band"></i>80 % der Läufe</span>
+      <span><i class="band"></i>80% CI</span>
       <span>☀︎ viel <i class="sunbar"></i> wenig</span>
-      <span>💧 Regen (Median)</span>
+      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
     </div>
   </section>
 
@@ -252,7 +255,7 @@
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
-    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge (mm/h, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge, Tropfen nach Regenmenge (klein ab 0,2 mm, groß ab 2 mm, zwei ab 8 mm). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = Spanne von 80 % der Läufe, Tropfen nach Median; wird höchstens alle 6 h neu geladen.
+    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge. Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median; wird höchstens alle 12 h oder über ↻ neu geladen.
   </p>
 </main>
 
@@ -288,14 +291,14 @@
   const fmt1 = v => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // ---------- Daten ----------
-  async function load() {
+  async function load(force) {
     const { lat, lon } = state.loc;
     state.lastAttempt = Date.now();
     $('status').style.display = state.data ? 'none' : 'flex';
     const url = 'https://api.open-meteo.com/v1/forecast'
       + `?latitude=${lat}&longitude=${lon}`
-      + '&hourly=temperature_2m,precipitation_probability,precipitation,uv_index,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,apparent_temperature,freezing_level_height'
-      + '&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration,daylight_duration'
+      + '&hourly=temperature_2m,precipitation_probability,precipitation,uv_index,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,apparent_temperature,freezing_level_height,snowfall'
+      + '&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,sunshine_duration,daylight_duration'
       + '&current=temperature_2m,relative_humidity_2m'
       + '&timezone=auto&timeformat=unixtime&forecast_days=14'; // bis 14 Tage zählt als ein (gewichteter) Abruf
     // Tide (Meeresspiegel inkl. Gezeiten) aus dem Meeresmodell; im Binnenland nur leere Werte
@@ -315,7 +318,7 @@
       state.fetchedAt = new Date();
       $('status').style.display = 'none';
       render();
-      loadEns();
+      loadEns(force === true);
     } catch (e) {
       $('status').textContent = 'Wetterdaten konnten nicht geladen werden (' + e.message + ').';
       $('status').style.display = 'flex';
@@ -323,15 +326,15 @@
   }
 
   // ECMWF-Ensemble (51 Läufe) für einen ruhigeren 14-Tage-Trend. Neue Läufe kommen nur wenige Male
-  // am Tag → pro Ort höchstens alle 6 h abrufen und im Browser zwischenspeichern.
-  const ENS_MAX_AGE = 6 * 3600 * 1000;
-  async function loadEns() {
+  // am Tag → pro Ort höchstens alle 12 h abrufen (oder über den ↻-Knopf) und im Browser zwischenspeichern.
+  const ENS_MAX_AGE = 12 * 3600 * 1000;
+  async function loadEns(force) {
     const key = tideKey(state.loc), cached = store.get('ens');
-    if (cached && cached.key === key && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
+    if (!force && cached && cached.key === key && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
     const { lat, lon } = state.loc;
     const url = 'https://ensemble-api.open-meteo.com/v1/ensemble'
       + `?latitude=${lat}&longitude=${lon}&models=ecmwf_ifs025`
-      + '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration'
+      + '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,sunshine_duration'
       + '&timezone=auto&timeformat=unixtime&forecast_days=14';
     try {
       const r = await fetch(url);
@@ -342,13 +345,14 @@
         .map(k => dl[k][i]).filter(x => x != null).sort((a, b) => a - b));
       const mean = a => a.length ? a.reduce((p, q) => p + q, 0) / a.length : null;
       const q = (a, f) => a.length ? a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))] : null;
-      const mx = runs('temperature_2m_max'), mn = runs('temperature_2m_min'), rr = runs('precipitation_sum'), su = runs('sunshine_duration');
+      const mx = runs('temperature_2m_max'), mn = runs('temperature_2m_min'), rr = runs('precipitation_sum'), su = runs('sunshine_duration'), sn = runs('snowfall_sum');
       state.ens = {
         time: dl.time,
         max: mx.map(mean), min: mn.map(mean),
         maxLo: mx.map(a => q(a, .1)), maxHi: mx.map(a => q(a, .9)),
         minLo: mn.map(a => q(a, .1)), minHi: mn.map(a => q(a, .9)),
         rain: rr.map(a => q(a, .5)),      // Median: Mittelwerte würden Regen über alle Tage verschmieren
+        snow: sn.map(a => q(a, .5)),      // Schnee in cm (Median)
         sun: su.map(mean),
       };
       store.set('ens', { key, at: Date.now(), series: state.ens });
@@ -534,6 +538,28 @@
   const windColor = v => v < 12 ? '#8e8e93' : v < 29 ? '#34c759' : v < 50 ? '#ff9500' : '#ff3b30';
   const compass = deg => ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 
+  // Niederschlag: feste Stufenskala 0–5 mm in der unteren Hälfte, 5–50 mm gestaucht in der oberen
+  const R_STEP = 5, R_MAX = 50;
+  const rainFrac = v => v <= R_STEP ? v / R_STEP * 0.5 : 0.5 + (Math.min(v, R_MAX) - R_STEP) / (R_MAX - R_STEP) * 0.5;
+  const snowWater = cm => (cm || 0) * 10 / 7; // Open-Meteo: 7 cm Schnee ≈ 10 mm Wasser
+  // Balken mit Schnee-Anteil unten (violett) und Regen darüber (blau); jeweils kräftig über 5 mm
+  function precipBar(g, x, w, base, fullH, v, snowV) {
+    const Y = val => base - rainFrac(val) * fullH;
+    snowV = Math.min(v, snowV || 0);
+    const seg = (a, b, light, strong) => {
+      const h1 = Math.min(b, R_STEP);
+      if (h1 > a) el('rect', { x, y: Y(h1), width: w, height: Y(a) - Y(h1), fill: light }, g);
+      const a2 = Math.max(a, R_STEP);
+      if (b > a2) el('rect', { x, y: Y(b), width: w, height: Y(a2) - Y(b), fill: strong }, g);
+    };
+    if (base - Y(v) < 2) { // sehr wenig: mind. 2 px in der überwiegenden Farbe
+      el('rect', { x, y: base - 2, width: w, height: 2, fill: css(snowV > v / 2 ? '--snow' : '--rain') }, g);
+      return;
+    }
+    seg(0, snowV, css('--snow'), css('--snow-strong'));
+    seg(snowV, v, css('--rain'), css('--rain-strong'));
+  }
+
   let view = null; // für Tooltip
 
   function renderChart() {
@@ -580,8 +606,6 @@
     const mm = idx.slice(1).map(i => d.hourly.precipitation[i] ?? 0);
     const prob = idx.slice(1).map(i => d.hourly.precipitation_probability[i] ?? 0);
     // Feste Stufenskala: 0–5 mm/h untere Hälfte (linear), 5–50 mm/h obere Hälfte (gestaucht)
-    const R_STEP = 5, R_MAX = 50;
-    const rainFrac = v => v <= R_STEP ? v / R_STEP * 0.5 : 0.5 + (Math.min(v, R_MAX) - R_STEP) / (R_MAX - R_STEP) * 0.5;
     const yp = v => m.t + ph - rainFrac(v) * ph;
 
     // Zeichenfläche beschneiden
@@ -670,17 +694,15 @@
 
     // 2) Niederschlagsbalken (Wert gilt für die vorangegangene Stunde)
     //    Anteil bis 5 mm halbtransparent, darüber deckendes Blau; über 50 mm ▲ an der Spitze
+    //    Schnee-Anteil violett (unten im Balken), Regen blau
     const bars = el('g', {}, plot);
     const base = m.t + ph;
+    const snowH = d.hourly.snowfall;
     mm.forEach((v, k) => {
       if (v < 0.1) return;
       const tb = t0 + (k + 1) * H;
       const xa = x(tb - H) + 1, bw = Math.max(1, x(tb) - 1 - xa);
-      const yLow = Math.min(yp(Math.min(v, R_STEP)), base - 2); // mind. 2 px sichtbar
-      el('rect', { x: xa, y: yLow, width: bw, height: base - yLow, fill: css('--rain') }, bars);
-      if (v > R_STEP) {
-        el('rect', { x: xa, y: yp(v), width: bw, height: yp(R_STEP) - yp(v), fill: css('--rain-strong') }, bars);
-      }
+      precipBar(bars, xa, bw, base, ph, v, snowH ? snowWater(snowH[idx[k + 1]]) : 0);
       if (v > R_MAX) {
         const t = el('text', { x: xa + bw / 2, y: m.t + 10, 'text-anchor': 'middle', 'font-size': 9, fill: '#fff' }, bars);
         t.textContent = '▲';
@@ -945,6 +967,7 @@
     const fl = state.opts.feels && d.hourly.apparent_temperature ? d.hourly.apparent_temperature[i] : null;
     tip.innerHTML = `<b>${hh}:00</b> · ${fmt1(view.temps[k])} °C` + (fl != null ? ` (gefühlt ${fmt1(fl)} °C)` : '') + (w ? ` · ${w[3]}` : '')
       + (k > 0 ? ` · 💧 ${p ?? '–'} % · ${fmt1(mm ?? 0)} mm` : '')
+      + (k > 0 && d.hourly.snowfall && d.hourly.snowfall[i] > 0 ? ` · <span style="color:var(--snow-strong)">❄︎ ${fmt1(d.hourly.snowfall[i])} cm</span>` : '')
       + (state.opts.uv ? ` · <span style="color:var(--uv)">UV ${fmt1(d.hourly.uv_index[i] ?? 0)}</span>` : '')
       + (() => {
         if (!state.tide || !state.opts.tide) return '';
@@ -1009,7 +1032,7 @@
     const n = Math.min(14, ser.time.length);
     const W = Math.max(280, $(id + 'Chart').clientWidth);
     const small = W < 420;
-    const HEAD = 22, CELL = small ? 26 : 30, PH = Math.round(Math.min(210, Math.max(150, W * 0.36)));
+    const HEAD = 22, CELL = small ? 14 : 16, PH = Math.round(Math.min(210, Math.max(150, W * 0.36)));
     const Hh = HEAD + PH + CELL + 2;
     svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
     svg.setAttribute('width', W); svg.setAttribute('height', Hh);
@@ -1037,6 +1060,13 @@
       el('path', { d: monotonePath(up) + monotonePath(dn).replace(/^M/, 'L') + 'Z', fill: col }, svg);
     });
 
+    // Niederschlagsbalken (dünn, ohne Skala) hinter den Kurven, gleiche Stufenskala wie oben
+    const bw = Math.max(3, cw * 0.32);
+    for (let j = 0; j < n; j++) {
+      const r = ser.rain[j] || 0;
+      if (r >= 0.2) precipBar(svg, cx(j) - bw / 2, bw, HEAD + PH, PH - padT, r, snowWater(ser.snow ? ser.snow[j] : 0));
+    }
+
     const fs = small ? 12 : 15;
     [[mx, css('--warm'), -8], [mn, css('--cold'), fs + 5]].forEach(([vals, col, dy]) => {
       el('path', { d: monotonePath(vals.map((v, j) => [cx(j), yT(v)])), fill: 'none', stroke: css('--trend-line'), 'stroke-width': 1.5 }, svg);
@@ -1048,18 +1078,11 @@
     });
 
     const y0 = HEAD + PH + 2;
-    const drop = (x, y, sc) => el('path', {
-      d: 'M0,-7 C2.8,-3.2 4.6,-0.6 4.6,2 A4.6,4.6 0 1 1 -4.6,2 C-4.6,-0.6 -2.8,-3.2 0,-7 Z',
-      transform: `translate(${x},${y}) scale(${sc})`, fill: css('--drop'), stroke: css('--drop-edge'), 'stroke-width': 0.9 / sc }, svg);
     const daylight = t => { const i = dl.time.indexOf(t); return i >= 0 ? dl.daylight_duration[i] : 12 * 3600; };
     for (let j = 0; j < n; j++) {
       const sunFrac = Math.min(1, (ser.sun[j] || 0) / daylight(ser.time[j]));
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: css('--cell') }, svg);
-      el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${(sunFrac * 0.85).toFixed(2)})` }, svg);
-      const r = ser.rain[j] || 0, cyD = y0 + CELL / 2 + 1.5, sc = small ? 0.85 : 1;
-      if (r >= 8) { drop(cx(j) - 3.5 * sc, cyD - 2, 0.95 * sc); drop(cx(j) + 3.5 * sc, cyD + 1.5, 1.15 * sc); }
-      else if (r >= 2) drop(cx(j), cyD, 1.1 * sc);
-      else if (r >= 0.2) drop(cx(j), cyD + 1, 0.75 * sc);
+      el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${sunFrac.toFixed(2)})` }, svg);
     }
     trendViews[id] = { n, cw, W, ser, daylight };
   }
@@ -1068,7 +1091,7 @@
     const dl = state.data.daily;
     if (!dl.temperature_2m_max) { $('trendSvg').replaceChildren(); return; }
     drawTrend('trend', { time: dl.time, max: dl.temperature_2m_max, min: dl.temperature_2m_min,
-      rain: dl.precipitation_sum, sun: dl.sunshine_duration });
+      rain: dl.precipitation_sum, snow: dl.snowfall_sum, sun: dl.sunshine_duration });
   }
   function renderEns() {
     if (!state.data || !state.ens) return;
@@ -1088,7 +1111,9 @@
     const tip = $(id + 'Tip');
     tip.innerHTML = `<b>${date}</b> · <span style="color:var(--warm)">${fmt1(ser.max[j])}°</span>${range(ser.maxLo, ser.maxHi)} / `
       + `<span style="color:var(--cold)">${fmt1(ser.min[j])}°</span>${range(ser.minLo, ser.minHi)}`
-      + ` · 💧 ${fmt1(ser.rain[j] || 0)} mm · ☀︎ ${fmt1((ser.sun[j] || 0) / 3600)} h von ${fmt1(v.daylight(ser.time[j]) / 3600)} h`;
+      + ` · 💧 ${fmt1(ser.rain[j] || 0)} mm`
+      + (ser.snow && ser.snow[j] > 0 ? ` · <span style="color:var(--snow-strong)">❄︎ ${fmt1(ser.snow[j])} cm</span>` : '')
+      + ` · ☀︎ ${fmt1((ser.sun[j] || 0) / 3600)} h von ${fmt1(v.daylight(ser.time[j]) / 3600)} h`;
     tip.style.display = 'block';
     const tw = tip.offsetWidth, left = ((j + 0.5) * v.cw) * rect.width / v.W;
     tip.style.left = Math.min(rect.width - tw, Math.max(0, left - tw / 2)) + 'px';
@@ -1173,7 +1198,7 @@
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
   });
 
-  $('reload').addEventListener('click', load);
+  $('reload').addEventListener('click', () => load(true)); // Knopf lädt auch das Ensemble neu
 
   // ---------- Einstellungen ----------
   document.querySelectorAll('#settings input[data-opt]').forEach(cb => {
