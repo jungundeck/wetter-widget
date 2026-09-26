@@ -91,7 +91,13 @@
   .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
   .chart svg.dragging { cursor: grabbing; }
   .trend { margin-top: 16px; }
-  .trend h2 { font-size: 15px; font-weight: 600; margin: 0 4px 6px; }
+  .trend h2 { font-size: 15px; font-weight: 600; margin: 0; display: inline; }
+  .trend summary { list-style: none; cursor: pointer; padding: 0 4px; }
+  .trend summary::-webkit-details-marker { display: none; }
+  .trend summary::after { content: "▾"; float: right; color: var(--muted); }
+  .trend[open] summary { margin-bottom: 6px; }
+  .trend[open] summary::after { content: "▴"; }
+  .trend { display: block; }
   .trend h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
   .trend .bar { width: 5px; height: 12px; border-radius: 1px; display: inline-block; }
   .trend .band { width: 18px; height: 10px; border-radius: 2px; display: inline-block;
@@ -132,7 +138,7 @@
   }
 
   /* Bedienelemente */
-  .controls { margin-top: 20px; display: grid; gap: 12px; }
+  .controls { margin-top: 16px; display: grid; gap: 12px; }
   .settings {
     background: var(--input); border: 1px solid var(--border); border-radius: 10px;
   }
@@ -199,36 +205,6 @@
     </div>
   </section>
 
-  <section class="widget trend" aria-label="14-Tage-Trend">
-    <h2>14-Tage-Trend</h2>
-    <div class="chart" id="trendChart">
-      <svg id="trendSvg" role="img" aria-label="Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
-      <div class="tip" id="trendTip"></div>
-    </div>
-    <div class="legend">
-      <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
-      <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
-      <span>☀︎ viel <i class="sunbar"></i> wenig</span>
-      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee</span>
-    </div>
-  </section>
-
-  <section class="widget trend" aria-label="14-Tage-Trend Ensemble-Mittel">
-    <h2>14-Tage-Trend · Ensemble-Mittel <small>(ECMWF, 51 Läufe)</small></h2>
-    <div class="chart" id="ensChart">
-      <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
-      <div class="tip" id="ensTip"></div>
-      <div class="status" id="ensStatus">Lade Ensemble …</div>
-    </div>
-    <div class="legend">
-      <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
-      <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
-      <span><i class="band"></i>80% CI</span>
-      <span>☀︎ viel <i class="sunbar"></i> wenig</span>
-      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
-    </div>
-  </section>
-
   <section class="controls">
     <div class="row">
       <div class="search">
@@ -252,6 +228,36 @@
       </div>
     </details>
   </section>
+
+  <details class="widget trend" id="trendBox" open aria-label="14-Tage-Trend">
+    <summary><h2>14-Tage-Trend</h2></summary>
+    <div class="chart" id="trendChart">
+      <svg id="trendSvg" role="img" aria-label="Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
+      <div class="tip" id="trendTip"></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
+      <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
+      <span>☀︎ viel <i class="sunbar"></i> wenig</span>
+      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee</span>
+    </div>
+  </details>
+
+  <details class="widget trend" id="ensBox" open aria-label="14-Tage-Trend Ensemble-Mittel">
+    <summary><h2>14-Tage-Trend · Ensemble-Mittel <small>(ECMWF, 51 Läufe)</small></h2></summary>
+    <div class="chart" id="ensChart">
+      <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
+      <div class="tip" id="ensTip"></div>
+      <div class="status" id="ensStatus">Lade Ensemble …</div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
+      <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
+      <span><i class="band"></i>80% CI</span>
+      <span>☀︎ viel <i class="sunbar"></i> wenig</span>
+      <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
+    </div>
+  </details>
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
@@ -329,6 +335,7 @@
   // am Tag → pro Ort höchstens alle 12 h abrufen (oder über den ↻-Knopf) und im Browser zwischenspeichern.
   const ENS_MAX_AGE = 12 * 3600 * 1000;
   async function loadEns(force) {
+    if (!$('ensBox').open) return; // zugeklappt: nichts abrufen, erst beim Aufklappen
     const key = tideKey(state.loc), cached = store.get('ens');
     if (!force && cached && cached.key === key && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
     const { lat, lon } = state.loc;
@@ -1092,13 +1099,14 @@
   }
 
   function renderTrend() {
+    if (!$('trendBox').open) return;
     const dl = state.data.daily;
     if (!dl.temperature_2m_max) { $('trendSvg').replaceChildren(); return; }
     drawTrend('trend', { time: dl.time, max: dl.temperature_2m_max, min: dl.temperature_2m_min,
       rain: dl.precipitation_sum, snow: dl.snowfall_sum, sun: dl.sunshine_duration });
   }
   function renderEns() {
-    if (!state.data || !state.ens) return;
+    if (!state.data || !state.ens || !$('ensBox').open) return;
     $('ensStatus').style.display = 'none';
     drawTrend('ens', { ...state.ens, minRain: 1 }); // Balken erst ab 1 mm Median (sonst Mini-Balken an meist trockenen Tagen)
   }
@@ -1255,6 +1263,16 @@
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#svg')) hideTip(); });
 
   new ResizeObserver(() => render()).observe($('chart'));
+  // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
+  const boxes = store.get('boxes') || {};
+  ['trendBox', 'ensBox'].forEach(id => {
+    if (boxes[id] === false) $(id).open = false;
+    $(id).addEventListener('toggle', () => {
+      boxes[id] = $(id).open; store.set('boxes', boxes);
+      if ($(id).open && state.data) { if (id === 'trendBox') renderTrend(); else if (state.ens) renderEns(); else loadEns(); }
+    });
+  });
+
   ['trend', 'ens'].forEach(id => {
     const el2 = $(id + 'Svg');
     el2.addEventListener('pointermove', e => showTrendTip(id, e));
