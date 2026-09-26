@@ -165,6 +165,11 @@
   .settings .opts { display: grid; gap: 2px; padding: 0 12px 10px; }
   .settings label { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; }
   .settings input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  .settings label.sel { justify-content: space-between; }
+  .settings select {
+    font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; max-width: 60%;
+  }
   .settings small { color: var(--muted); }
   @media (max-width: 480px) {
     main { padding: 12px 10px 32px; }
@@ -273,13 +278,22 @@
         <label><input type="checkbox" data-opt="uv"> UV-Index</label>
         <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
         <label><input type="checkbox" data-opt="clouds"> Wolken</label>
+        <label><input type="checkbox" data-opt="windbar"> Wind-Leiste</label>
+        <label><input type="checkbox" data-opt="symbols"> Wettersymbole</label>
+        <label class="sel">Wind in
+          <select id="windUnit">
+            <option value="kmh">km/h</option><option value="ms">m/s</option>
+            <option value="bft">Beaufort (Bft)</option><option value="kn">Knoten (kn)</option>
+          </select></label>
+        <label class="sel">Beim Start zeigen
+          <select id="startLoc"></select></label>
       </div>
     </details>
   </section>
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
-    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge (quadratisch: kräftig nur bei viel Sonne). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median ab 1 mm; wird höchstens alle 12 h oder über ↻ neu geladen.
+    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; Einheit wählbar, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge (quadratisch: kräftig nur bei viel Sonne). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median ab 1 mm; wird höchstens alle 12 h oder über ↻ neu geladen.
   </p>
 </main>
 
@@ -306,7 +320,8 @@
     ens: null,  // 14-Tage-Ensemble (Mittelwerte), alle 6 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
-    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true }, store.get('opts') || {}),
+    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true,
+      windUnit: 'kmh', start: 'last' }, store.get('opts') || {}),
   };
 
   // Orte ohne Tide-Daten (Binnenland) merken, damit die Meeres-Anfrage dort entfällt
@@ -563,6 +578,17 @@
   const wmo = c => WMO.find(([cs]) => cs.includes(c)) || null;
 
   const windColor = v => v < 12 ? '#8e8e93' : v < 29 ? '#34c759' : v < 50 ? '#ff9500' : '#ff3b30';
+  // Windgeschwindigkeit (Daten in km/h) in der gewählten Einheit; Farben bleiben an km/h gebunden
+  const BFT = [1, 6, 12, 20, 29, 39, 50, 62, 75, 89, 103, 118]; // Untergrenzen Bft 1…12 in km/h
+  const windVal = v => {
+    switch (state.opts.windUnit) {
+      case 'ms': return Math.round(v / 3.6);
+      case 'kn': return Math.round(v / 1.852);
+      case 'bft': return BFT.filter(b => v >= b).length;
+      default: return Math.round(v);
+    }
+  };
+  const windUnitTxt = () => ({ kmh: 'km/h', ms: 'm/s', bft: 'Bft', kn: 'kn' })[state.opts.windUnit] || 'km/h';
   const compass = deg => ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 
   // Niederschlag: feste Stufenskala 0–5 mm in der unteren Hälfte, 5–50 mm gestaucht in der oberen
@@ -594,7 +620,7 @@
     const off = d.utc_offset_seconds;
     const svg = $('svg');
     const W = Math.max(280, $('chart').clientWidth);
-    const WIND_H = 20; // Höhe der Wind-Leiste unter der Zeitachse
+    const WIND_H = state.opts.windbar ? 20 : 0; // Höhe der Wind-Leiste unter der Zeitachse (aus: 0)
     const PROB_H = 6; // Leiste für Regenwahrscheinlichkeit direkt unter der Grafik
     const Hh = Math.round(Math.min(306, Math.max(180, W * 0.56))) + WIND_H + PROB_H;
     svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
@@ -831,7 +857,7 @@
     const symEvery = pw / 12 >= 26 ? 2 : 4;
     const symK = [];
     const wc = d.hourly.weather_code;
-    if (wc) {
+    if (state.opts.symbols && wc) {
       const FS = 17, halfW = FS * 0.6 + 2, gap = 3;
       const curve = [];
       [tPath, fPath].filter(Boolean).forEach(path => {
@@ -939,7 +965,7 @@
     // Wind-Leiste (unter der Zeitachse): Pfeil zeigt, wohin der Wind weht; Farbe nach Stärke; Zahl in km/h,
     // klein rechts neben dem Pfeil; bei deutlich stärkeren Böen beide Zahlen übereinander. Alle 2 h (bei schmaler Anzeige alle 4 h).
     const ws = d.hourly.wind_speed_10m, wd = d.hourly.wind_direction_10m, wg = d.hourly.wind_gusts_10m;
-    if (ws && wd) {
+    if (state.opts.windbar && ws && wd) {
       const wind = el('g', {}, svg);
       const ay = m.t + ph + PROB_H + 31; // dicht unter der Zeitachse
       for (let k = 0; k <= 24; k++) {
@@ -958,10 +984,10 @@
         }
         const gust = g != null && g - v >= 10 && g >= 25;
         const lbl = el('text', { x: ax0 + 8, y: gust ? ay - 1.5 : ay + 3.5, class: 'wind' }, wind);
-        lbl.textContent = Math.round(v);
+        lbl.textContent = windVal(v);
         if (gust) {
           const gl = el('text', { x: ax0 + 8, y: ay + 8.5, class: 'wind', style: `fill:${windColor(g)}`, 'font-weight': 600 }, wind);
-          gl.textContent = '↯' + Math.round(g);
+          gl.textContent = '↯' + windVal(g);
         }
       }
     }
@@ -1006,8 +1032,8 @@
         ? `<br>☁︎ tief ${d.hourly.cloud_cover_low[i] ?? '–'} % · mittel ${d.hourly.cloud_cover_mid[i] ?? '–'} % · hoch ${d.hourly.cloud_cover_high[i] ?? '–'} %`
         : '')
       + (d.hourly.wind_speed_10m
-        ? `<br>💨 ${Math.round(d.hourly.wind_speed_10m[i])} km/h aus ${compass(d.hourly.wind_direction_10m[i])}`
-          + (d.hourly.wind_gusts_10m ? ` · Böen ${Math.round(d.hourly.wind_gusts_10m[i])} km/h` : '')
+        ? `<br>💨 ${windVal(d.hourly.wind_speed_10m[i])} ${windUnitTxt()} aus ${compass(d.hourly.wind_direction_10m[i])}`
+          + (d.hourly.wind_gusts_10m ? ` · Böen ${windVal(d.hourly.wind_gusts_10m[i])} ${windUnitTxt()}` : '')
         : '');
     tip.style.display = 'block';
     const left = cx * rect.width / view.W;
@@ -1202,8 +1228,16 @@
     ed.addEventListener('click', () => { state.editTabs = !state.editTabs; renderTabs(); });
     tabs.push(ed);
     $('tabs').replaceChildren(...tabs);
+    renderStartSelect();
     const act = $('tabs').querySelector('.tab.active');
     if (act) act.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  // Auswahl „Beim Start zeigen“: zuletzt gezeigter Ort, aktueller Standort oder ein gespeicherter Ort
+  function renderStartSelect() {
+    const sel = $('startLoc');
+    const opts = [['last', 'Zuletzt gezeigten Ort'], ['gps', 'Aktuellen Standort'], ...state.favs.map(f => [locKey(f), f.name])];
+    sel.replaceChildren(...opts.map(([v, t]) => Object.assign(document.createElement('option'), { value: v, textContent: t })));
+    sel.value = opts.some(([v]) => v === state.opts.start) ? state.opts.start : 'last';
   }
   function addFav(loc) {
     if (!state.favs.some(f => locKey(f) === locKey(loc))) { state.favs.push(loc); store.set('favs', state.favs); }
@@ -1269,8 +1303,9 @@
     setLoc(loc);
   }
 
-  function locate() {
-    if (!navigator.geolocation) return alert('Standortbestimmung wird nicht unterstützt.');
+  // onFail: beim Start ohne Meldung auf den zuletzt gezeigten Ort ausweichen
+  function locate(onFail) {
+    if (!navigator.geolocation) return typeof onFail === 'function' ? onFail() : alert('Standortbestimmung wird nicht unterstützt.');
     $('gps').disabled = true;
     navigator.geolocation.getCurrentPosition(async pos => {
       const lat = +pos.coords.latitude.toFixed(4), lon = +pos.coords.longitude.toFixed(4);
@@ -1284,13 +1319,17 @@
       setLoc({ name, region, lat, lon, gps: true });
     }, err => {
       $('gps').disabled = false;
-      alert('Standort nicht verfügbar: ' + err.message);
+      if (typeof onFail === 'function') onFail();
+      else alert('Standort nicht verfügbar: ' + err.message);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
   }
 
   $('reload').addEventListener('click', () => load(true)); // Knopf lädt auch das Ensemble neu
 
   // ---------- Einstellungen ----------
+  $('windUnit').value = state.opts.windUnit;
+  $('windUnit').addEventListener('change', () => { state.opts.windUnit = $('windUnit').value; store.set('opts', state.opts); render(); });
+  $('startLoc').addEventListener('change', () => { state.opts.start = $('startLoc').value; store.set('opts', state.opts); });
   document.querySelectorAll('#settings input[data-opt]').forEach(cb => {
     cb.checked = !!state.opts[cb.dataset.opt];
     cb.addEventListener('change', () => {
@@ -1370,9 +1409,13 @@
   setInterval(tick, 60 * 1000);
   document.addEventListener('visibilitychange', tick);
 
+  // Start-Ort anwenden
+  const st = state.opts.start, startFav = state.favs.find(f => locKey(f) === st);
+  if (startFav) state.loc = startFav;
   $('name').textContent = state.loc.name;
   renderTabs();
-  load();
+  if (st === 'gps') { $('status').textContent = 'Ermittle Standort …'; locate(load); }
+  else load();
 })();
 </script>
 </body>
