@@ -74,7 +74,11 @@
   .head .updated > span + span::before { content: "·"; margin: 0 6px; }
 
   .chart { position: relative; width: 100%; }
-  .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+  .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .chart svg.dragging { cursor: grabbing; }
+  .nowbtn {
+    position: absolute; left: 32px; top: 0; padding: 1px 7px; font-size: 10px; line-height: 14px; border-radius: 7px;
+  }
   .axis text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
   .axis .sun { font-size: 10px; }
   .wind { font-size: 9px; fill: var(--muted); font-variant-numeric: tabular-nums; }
@@ -159,6 +163,7 @@
     <div class="chart" id="chart">
       <svg id="svg" role="img" aria-label="Temperatur und Niederschlag der nächsten 24 Stunden"></svg>
       <div class="tip" id="tip"></div>
+      <button id="nowBtn" class="nowbtn" hidden title="Zurück zur aktuellen Stunde">⟲ Jetzt</button>
       <div class="status" id="status">Lade Wetterdaten …</div>
     </div>
   </section>
@@ -211,6 +216,7 @@
     tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
     fetchedAt: null,
     lastAttempt: 0,
+    offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
     opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true }, store.get('opts') || {}),
   };
@@ -232,10 +238,10 @@
       + '&hourly=temperature_2m,precipitation_probability,precipitation,uv_index,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,apparent_temperature,freezing_level_height'
       + '&daily=sunrise,sunset'
       + '&current=temperature_2m,relative_humidity_2m'
-      + '&timezone=auto&timeformat=unixtime&forecast_days=3';
+      + '&timezone=auto&timeformat=unixtime&forecast_days=7';
     // Tide (Meeresspiegel inkl. Gezeiten) aus dem Meeresmodell; im Binnenland nur leere Werte
     const tideUrl = 'https://marine-api.open-meteo.com/v1/marine'
-      + `?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl&timezone=auto&timeformat=unixtime&forecast_days=3`;
+      + `?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl&timezone=auto&timeformat=unixtime&forecast_days=7`;
     const key = tideKey(state.loc);
     const wantTide = state.opts.tide && !noTide.has(key);
     const tideReq = wantTide ? fetch(tideUrl).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null);
@@ -451,7 +457,8 @@
 
     // Zeitfenster: Beginn der aktuellen Stunde (Ortszeit) bis +24 h
     const nowS = Date.now() / 1000;
-    const t0 = Math.floor((nowS + off) / H) * H - off;
+    state.offset = Math.min(state.offset, maxOffset());
+    const t0 = nowHour() + state.offset * H;
     const t1 = t0 + DAY;
     const x = t => m.l + (t - t0) / DAY * pw;
 
@@ -780,7 +787,7 @@
       if (hr === 0) {
         lbl.setAttribute('class', 'strong');
         lbl.textContent = new Date((t + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' });
-      } else lbl.textContent = String(hr).padStart(2, '0');
+      } else lbl.textContent = String(hr);
     }
 
     // Wind-Leiste (unter der Zeitachse): Pfeil zeigt, wohin der Wind weht; Farbe nach Stärke; Zahl in km/h,
@@ -865,10 +872,31 @@
     if (view) { view.cursor.setAttribute('visibility', 'hidden'); view.dot.setAttribute('visibility', 'hidden'); }
   }
 
+  // aktuelle volle Stunde (Ortszeit) und maximale Verschiebung nach rechts
+  function nowHour() {
+    const off = state.data.utc_offset_seconds;
+    return Math.floor((Date.now() / 1000 + off) / H) * H - off;
+  }
+  function maxOffset() {
+    const ht = state.data.hourly.time;
+    return Math.max(0, Math.floor((ht[ht.length - 1] - nowHour()) / H) - 24);
+  }
+  function setOffset(o) {
+    if (!state.data) return;
+    o = Math.max(0, Math.min(maxOffset(), o));
+    if (o === state.offset) return;
+    state.offset = o;
+    hideTip();
+    renderChart();
+    updateNowBtn();
+  }
+  function updateNowBtn() { $('nowBtn').hidden = state.offset === 0; }
+
   function render() {
     if (!state.data) return;
     renderHeader();
     renderChart();
+    updateNowBtn();
   }
 
   // ---------- Ort wählen ----------
@@ -960,9 +988,41 @@
     });
   });
 
-  $('svg').addEventListener('pointermove', showTip);
-  $('svg').addEventListener('pointerdown', showTip);
-  $('svg').addEventListener('pointerleave', hideTip);
+  // Ziehen verschiebt die Ansicht stundenweise in die Zukunft (und zurück bis „jetzt“);
+  // ohne Ziehen zeigt Bewegen/Antippen den Tooltip
+  const svgEl = $('svg');
+  const pxPerHour = () => view ? view.pw / 24 * svgEl.getBoundingClientRect().width / view.W : 20;
+  let drag = null;
+  svgEl.addEventListener('pointerdown', e => {
+    drag = { id: e.pointerId, x: e.clientX, off: state.offset, moved: false };
+    showTip(e);
+  });
+  svgEl.addEventListener('pointermove', e => {
+    if (drag && e.pointerId === drag.id) {
+      const dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) > 6) {
+        drag.moved = true;
+        svgEl.setPointerCapture(e.pointerId);
+        svgEl.classList.add('dragging');
+        hideTip();
+      }
+      if (drag.moved) { setOffset(drag.off - Math.round(dx / pxPerHour())); return; }
+    }
+    showTip(e);
+  });
+  const endDrag = () => { drag = null; svgEl.classList.remove('dragging'); };
+  svgEl.addEventListener('pointerup', endDrag);
+  svgEl.addEventListener('pointercancel', endDrag);
+  svgEl.addEventListener('pointerleave', () => { if (!drag) hideTip(); });
+  let wheelAcc = 0;
+  svgEl.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // senkrechtes Scrollen der Seite nicht stören
+    e.preventDefault();
+    wheelAcc += e.deltaX;
+    const steps = Math.trunc(wheelAcc / pxPerHour());
+    if (steps) { wheelAcc -= steps * pxPerHour(); setOffset(state.offset + steps); }
+  }, { passive: false });
+  $('nowBtn').addEventListener('click', () => setOffset(0));
   // Mobil: Tippen außerhalb der Grafik schließt den Tooltip
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#svg')) hideTip(); });
 
