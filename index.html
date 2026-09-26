@@ -205,7 +205,16 @@
   .results li:hover, .results li.active { background: var(--bg); }
   .results small { color: var(--muted); }
   .label { color: var(--muted); font-size: 13px; }
-  .note { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  .help .helpbody { padding: 0 12px 12px; font-size: 13px; line-height: 1.45; }
+  .help h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 4px; }
+  .help .ex-row { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); }
+  .help .ex-row p, .help p.plain { margin: 0; }
+  .help .ex { color: var(--text); }
+  .help .ex svg { width: 84px; height: 32px; display: block; border-radius: 4px; }
+  .help .ex-text { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .help .ex-emoji { font-size: 17px; letter-spacing: 1px; }
+  @media (max-width: 480px) { .help .ex-row { grid-template-columns: 70px 1fr; gap: 10px; } .help .ex svg { width: 70px; height: 27px; } }
+  .note { color: var(--muted); font-size: 12px; margin-top: 14px; text-align: center; }
   .note a { color: inherit; }
 </style>
 </head>
@@ -291,9 +300,57 @@
     </details>
   </section>
 
+  <section class="controls">
+  <details class="settings help" id="help">
+    <summary>ℹ︎ Erklärungen</summary>
+    <div class="helpbody">
+
+      <h3>Kopfzeile</h3>
+      <div class="ex-row"><div class="ex ex-text">Untrasried (856 m): 19,9 °C | 35 %</div>
+        <p>Ort, Höhe über dem Meer, aktuelle Temperatur und Luftfeuchte.</p></div>
+      <div class="ex-row"><div class="ex ex-text">🌕 99 % ↑ 18:44 ↓ 07:57</div>
+        <p>Mond: Phase, beleuchteter Anteil, nächster Aufgang ↑ und Untergang ↓.</p></div>
+      <div class="ex-row"><div class="ex ex-text">❄︎ ab 900 m</div>
+        <p>Schneefallgrenze – erscheint nur, wenn sie in die Nähe der Ortshöhe kommt (höchstens 500 m darüber).</p></div>
+      <div class="ex-row"><div class="ex ex-text">🌊 ±1,9 m</div>
+        <p>Nur am Meer: Das Wasser schwankt heute um bis zu 1,9 m nach oben und unten (Tidenhub 3,8 m).</p></div>
+
+      <h3>Stundengrafik</h3>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><defs><linearGradient id="hx-sky"><stop offset="0" stop-color="#2c2c2c"/><stop offset=".3" stop-color="#2c2c2c"/><stop offset=".45" stop-color="#e8e8e8"/><stop offset=".75" stop-color="#e8e8e8"/><stop offset=".9" stop-color="#2c2c2c"/></linearGradient></defs><rect width="72" height="28" fill="url(#hx-sky)"/></svg></div>
+        <p>Hintergrund: hell = Tag, dunkel = Nacht, weicher Übergang = Dämmerung. Oben stehen die Zeiten: <b>↑ 07:10</b> Sonnenaufgang, <b>↓ 19:08</b> Sonnenuntergang. Bei Mondschein ist die Nacht etwas heller.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><line x1="0" y1="16" x2="72" y2="16" stroke="#999" stroke-dasharray="3 3"/><path d="M2 24 C20 22 26 8 40 6 S60 10 70 12" fill="none" stroke="#ff3b30" stroke-width="2.5"/><path d="M2 24 C12 23 16 19 21 16" fill="none" stroke="#007aff" stroke-width="2.5"/><path d="M2 27 C20 26 26 12 40 10 S60 14 70 16" fill="none" stroke="#ff3b30" stroke-width="1.1" stroke-dasharray="4 3"/></svg></div>
+        <p>Temperatur: <span style="color:var(--warm)">rot über 0 °C</span>, <span style="color:var(--cold)">blau darunter</span>; gestrichelte Linie = 0 °C. Die dünne gestrichelte Kurve ist die <b>gefühlte</b> Temperatur (Wind macht es kälter, Schwüle wärmer). Die Zahlen an der Kurve sind Tiefst- und Höchstwert.</p></div>
+      <div class="ex-row"><div class="ex ex-emoji">☀️ ⛅ 🌧️ 🌔</div>
+        <p>Wetter alle 2 Stunden. Nachts bei klarem Himmel zeigt das Symbol die aktuelle Mondphase (oder ✨, wenn der Mond noch nicht aufgegangen ist).</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M0 14 C14 14 22 3 36 3 S58 14 72 14 C58 14 50 25 36 25 S14 14 0 14Z" fill="rgba(205,205,205,.9)"/><path d="M4 14 C16 14 24 9 36 9 S56 14 68 14 C56 14 48 21 36 21 S16 14 4 14Z" fill="rgba(145,145,145,.85)"/><path d="M10 14 C20 14 28 13 36 13 S52 14 62 14 C52 14 44 19 36 19 S20 14 10 14Z" fill="rgba(95,95,95,.9)"/></svg></div>
+        <p>Wolken: Je <b>dicker</b> die graue Spindel oben, desto mehr ist bedeckt (max. = 100 %). Innen von oben nach unten: <b>hell</b> = hohe Schleierwolken, <b>mittel</b> = mittelhohe, <b>dunkel</b> = tiefe, dichte Wolken.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="4" y="25" width="10" height="3" fill="rgba(10,132,255,.4)"/><rect x="20" y="14" width="10" height="14" fill="rgba(10,132,255,.4)"/><rect x="36" y="14" width="10" height="14" fill="rgba(10,132,255,.4)"/><rect x="36" y="9" width="10" height="5" fill="rgba(10,100,230,.92)"/><rect x="54" y="18" width="10" height="10" fill="rgba(175,82,222,.45)"/></svg></div>
+        <p>Niederschlag je Stunde: <b>kleiner Balken ≈ 1 mm</b> (leichter Regen), <b>halbe Höhe = 5 mm</b> (kräftiger Regen). Was darüber hinausgeht, wird <b>dunkelblau</b> und gestaucht – oben endet die Skala bei 50 mm (Wolkenbruch). <span style="color:var(--snow-strong)">Violett</span> = Schnee.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="2" y="11" width="16" height="6" rx="1" fill="rgba(10,132,255,.1)"/><rect x="20" y="11" width="16" height="6" rx="1" fill="rgba(10,132,255,.4)"/><rect x="38" y="11" width="16" height="6" rx="1" fill="rgba(10,132,255,.7)"/><rect x="56" y="11" width="14" height="6" rx="1" fill="rgba(10,132,255,1)"/></svg></div>
+        <p>Blaue Leiste unter der Grafik = <b>Regenwahrscheinlichkeit</b>: fast leer = 10 %, halb = 40 %, kräftig = sicher. So erkennt man Schauer, auch wenn kein Balken zu sehen ist.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M2 26 C20 26 26 10 36 10 S52 26 70 26" fill="none" stroke="#ffcc00" stroke-width="1.5"/><text x="36" y="8" text-anchor="middle" font-size="8" font-weight="700" fill="#ffcc00">4,5</text></svg></div>
+        <p>Gelbe Linie = <b>UV-Index</b>, die Zahl ist der Tageshöchstwert. Ab 3 ist Sonnenschutz sinnvoll, ab 6 wird es hoch.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M0 18 C10 18 12 8 20 8 S30 22 40 22 S54 8 62 8 S70 14 72 14" fill="none" stroke="#1fa9c4" stroke-width="1.5"/><text x="20" y="6" text-anchor="middle" font-size="7" font-weight="600" fill="#1fa9c4">HW</text><text x="40" y="28" text-anchor="middle" font-size="7" font-weight="600" fill="#1fa9c4">NW</text></svg></div>
+        <p>Nur am Meer: türkise Linie = <b>Wasserstand</b> mit Hochwasser (HW) und Niedrigwasser (NW). Modellwerte – nicht für Navigation oder Wattwanderungen.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M0,-8 L5,-1 L1.6,-1 L1.6,7 L-1.6,7 L-1.6,-1 L-5,-1 Z" transform="translate(14,14)" fill="#34c759"/><text x="22" y="12" font-size="8" fill="currentColor">12</text><text x="22" y="22" font-size="8" font-weight="600" fill="#ff9500">↯39</text><path d="M0,-8 L5,-1 L1.6,-1 L1.6,7 L-1.6,7 L-1.6,-1 L-5,-1 Z" transform="translate(52,14) rotate(90)" fill="#8e8e93"/><text x="60" y="17" font-size="8" fill="currentColor">4</text></svg></div>
+        <p>Wind: Der Pfeil zeigt, <b>wohin</b> der Wind weht – ↑ heißt Wind aus Süden, → Wind aus Westen. <b>12 ↯39</b> = im Mittel 12, in Böen 39. Farbe: grau schwach, <span style="color:#34c759">grün</span> mäßig, <span style="color:#ff9500">orange</span> frisch, <span style="color:#ff3b30">rot</span> stürmisch. Einheit in den Einstellungen wählbar.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect width="72" height="28" fill="#e8e8e8"/><line x1="10" y1="0" x2="10" y2="28" stroke="rgba(255,159,10,.9)" stroke-width="1.5"/><line x1="36" y1="0" x2="36" y2="28" stroke="rgba(140,140,140,.5)"/><line x1="62" y1="0" x2="62" y2="28" stroke="rgba(140,140,140,.75)"/></svg></div>
+        <p>Senkrechte Linien: <span style="color:#ff9f0a">orange = jetzt</span>, dünn grau = 12 Uhr mittags, etwas kräftiger = Mitternacht. Die Grafik lässt sich mit Maus oder Finger <b>zur Seite ziehen</b> (bis 14 Tage), „⟲ Jetzt“ springt zurück.</p></div>
+
+      <h3>14-Tage-Trends</h3>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="0" width="24" height="22" fill="rgba(90,130,190,.12)"/><circle cx="12" cy="6" r="2.5" fill="#ff3b30"/><circle cx="36" cy="4" r="2.5" fill="#ff3b30"/><circle cx="60" cy="9" r="2.5" fill="#ff3b30"/><circle cx="12" cy="17" r="2.5" fill="#007aff"/><circle cx="36" cy="15" r="2.5" fill="#007aff"/><circle cx="60" cy="19" r="2.5" fill="#007aff"/><rect x="0" y="23" width="23" height="5" fill="rgba(252,242,40,1)"/><rect x="24" y="23" width="23" height="5" fill="rgba(252,242,40,.3)"/><rect x="48" y="23" width="24" height="5" fill="#ececec"/></svg></div>
+        <p>Pro Tag <span style="color:var(--warm)">Höchst-</span> und <span style="color:var(--cold)">Tiefstwert</span>, das Wochenende ist hinterlegt. Die Zeile darunter: <b>kräftig gelb</b> = fast den ganzen Tag Sonne, blass = etwas Sonne, grau = trüb. Dünne Balken = Regen bzw. Schnee des Tages.</p></div>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M2 12 C20 10 30 6 36 8 S56 4 70 2 L70 20 C56 18 44 18 36 16 S20 14 2 13Z" fill="rgba(255,59,48,.15)"/><path d="M2 12.5 C20 12 30 11 36 12 S56 11 70 11" fill="none" stroke="#c3cdd6" stroke-width="1.5"/><circle cx="36" cy="12" r="2.5" fill="#ff3b30"/></svg></div>
+        <p><b>Einzellauf</b> (oben): eine Modellrechnung – genau, aber in der zweiten Woche oft sprunghaft. <b>Ensemble-Mittel</b>: Durchschnitt aus 51 leicht unterschiedlichen Rechnungen – ruhiger. Die Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Je breiter die Fläche, desto unsicherer.</p></div>
+
+      <h3>Gut zu wissen</h3>
+      <p class="plain">Alle Werte sind Modellvorhersagen für den gewählten Punkt, keine Messwerte. Nachts kann es in Senken einige Grad kälter sein als angezeigt. Die Seite lädt stündlich neu (das Ensemble alle 12 Stunden), der ↻-Knopf sofort. Orte, Einstellungen und Aufklapp-Zustände werden nur in diesem Browser gespeichert.</p>
+    </div>
+  </details>
+  </section>
+
   <p class="note">
-    Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
-    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge, violett = Schnee (mm/h Wasser, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; Einheit wählbar, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; dünne Balken = Tagesmenge Regen (blau) bzw. Schnee (violett) mit derselben Stufenskala wie oben, ohne Achse; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge (quadratisch: kräftig nur bei viel Sonne). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = 80% CI (80 % der Läufe liegen darin), Balken nach Median ab 1 mm; wird höchstens alle 12 h oder über ↻ neu geladen.
+    Wetterdaten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) · Ortsname bei Ortung: BigDataCloud · Mondberechnung nach SunCalc
   </p>
 </main>
 
