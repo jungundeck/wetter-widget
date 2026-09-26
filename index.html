@@ -638,7 +638,7 @@
     // Zeichenfläche beschneiden
     const defs = el('defs', {}, svg);
     const clip = el('clipPath', { id: 'plot' }, defs);
-    el('rect', { x: m.l, y: m.t, width: pw, height: ph, rx: 6 }, clip);
+    el('rect', { x: m.l, y: m.t, width: pw, height: ph }, clip);
     const plot = el('g', { 'clip-path': 'url(#plot)' }, svg);
 
     // 1) Hintergrund: Tag/Nacht mit Dämmerungsverlauf.
