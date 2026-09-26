@@ -90,6 +90,9 @@
   .chart svg.dragging { cursor: grabbing; }
   .trend { margin-top: 16px; }
   .trend h2 { font-size: 15px; font-weight: 600; margin: 0 4px 6px; }
+  .trend h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .trend .band { width: 18px; height: 10px; border-radius: 2px; display: inline-block;
+    background: linear-gradient(180deg, rgba(255,59,48,.18), rgba(0,122,255,.18)); }
   .trend .chart svg { cursor: default; }
   .trend .legend {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 16px;
@@ -207,6 +210,22 @@
     </div>
   </section>
 
+  <section class="widget trend" aria-label="14-Tage-Trend Ensemble-Mittel">
+    <h2>14-Tage-Trend · Ensemble-Mittel <small>(ECMWF, 51 Läufe)</small></h2>
+    <div class="chart" id="ensChart">
+      <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
+      <div class="tip" id="ensTip"></div>
+      <div class="status" id="ensStatus">Lade Ensemble …</div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
+      <span><i class="dot" style="background:var(--cold)"></i>Min (°C)</span>
+      <span><i class="band"></i>80 % der Läufe</span>
+      <span>☀︎ viel <i class="sunbar"></i> wenig</span>
+      <span>💧 Regen (Median)</span>
+    </div>
+  </section>
+
   <section class="controls">
     <div class="row">
       <div class="search">
@@ -233,7 +252,7 @@
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
-    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge (mm/h, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge, Tropfen nach Regenmenge (klein ab 0,2 mm, groß ab 2 mm, zwei ab 8 mm). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern.
+    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge (mm/h, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch). 14-Tage-Trend: Höchst- und Tiefstwerte je Tag, Wochenende hinterlegt; Zelle darunter gelb nach Anteil Sonnenschein an der Tageslänge, Tropfen nach Regenmenge (klein ab 0,2 mm, groß ab 2 mm, zwei ab 8 mm). Die Grafik lässt sich seitlich ziehen, um bis zu 14 Tage weiterzublättern. Ensemble-Trend: Mittel aus 51 Läufen des europäischen Modells ECMWF (ruhiger, näher an geglätteten Vorhersagen), Flächen = Spanne von 80 % der Läufe, Tropfen nach Median; wird höchstens alle 6 h neu geladen.
   </p>
 </main>
 
@@ -255,6 +274,7 @@
     tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
     fetchedAt: null,
     lastAttempt: 0,
+    ens: null,  // 14-Tage-Ensemble (Mittelwerte), alle 6 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
     opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true }, store.get('opts') || {}),
@@ -295,9 +315,47 @@
       state.fetchedAt = new Date();
       $('status').style.display = 'none';
       render();
+      loadEns();
     } catch (e) {
       $('status').textContent = 'Wetterdaten konnten nicht geladen werden (' + e.message + ').';
       $('status').style.display = 'flex';
+    }
+  }
+
+  // ECMWF-Ensemble (51 Läufe) für einen ruhigeren 14-Tage-Trend. Neue Läufe kommen nur wenige Male
+  // am Tag → pro Ort höchstens alle 6 h abrufen und im Browser zwischenspeichern.
+  const ENS_MAX_AGE = 6 * 3600 * 1000;
+  async function loadEns() {
+    const key = tideKey(state.loc), cached = store.get('ens');
+    if (cached && cached.key === key && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
+    const { lat, lon } = state.loc;
+    const url = 'https://ensemble-api.open-meteo.com/v1/ensemble'
+      + `?latitude=${lat}&longitude=${lon}&models=ecmwf_ifs025`
+      + '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration'
+      + '&timezone=auto&timeformat=unixtime&forecast_days=14';
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const dl = (await r.json()).daily;
+      // je Tag: alle Läufe einer Variablen (Kontroll-Lauf + member01…50)
+      const runs = v => dl.time.map((_, i) => Object.keys(dl).filter(k => k === v || k.startsWith(v + '_member'))
+        .map(k => dl[k][i]).filter(x => x != null).sort((a, b) => a - b));
+      const mean = a => a.length ? a.reduce((p, q) => p + q, 0) / a.length : null;
+      const q = (a, f) => a.length ? a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))] : null;
+      const mx = runs('temperature_2m_max'), mn = runs('temperature_2m_min'), rr = runs('precipitation_sum'), su = runs('sunshine_duration');
+      state.ens = {
+        time: dl.time,
+        max: mx.map(mean), min: mn.map(mean),
+        maxLo: mx.map(a => q(a, .1)), maxHi: mx.map(a => q(a, .9)),
+        minLo: mn.map(a => q(a, .1)), minHi: mn.map(a => q(a, .9)),
+        rain: rr.map(a => q(a, .5)),      // Median: Mittelwerte würden Regen über alle Tage verschmieren
+        sun: su.map(mean),
+      };
+      store.set('ens', { key, at: Date.now(), series: state.ens });
+      renderEns();
+    } catch (e) {
+      $('ensStatus').textContent = 'Ensemble konnte nicht geladen werden (' + e.message + ').';
+      $('ensStatus').style.display = 'flex';
     }
   }
 
@@ -937,18 +995,19 @@
     renderChart();
     updateNowBtn();
     renderTrend();
+    renderEns();
   }
 
   // ---------- 14-Tage-Trend ----------
   // Spalte je Tag: Wochenende hinterlegt, Max (rot) und Min (blau) als Punkte mit Zahl an
   // grauen Verbindungslinien; darunter Zelle mit Sonnenschein (gelb = viel) und Regentropfen.
-  let trendView = null;
-  function renderTrend() {
-    const d = state.data, dl = d.daily, off = d.utc_offset_seconds;
-    const svg = $('trendSvg');
-    if (!dl.temperature_2m_max) { svg.replaceChildren(); return; }
-    const n = Math.min(14, dl.time.length);
-    const W = Math.max(280, $('trendChart').clientWidth);
+  // Optional (Ensemble): Flächen für die Spanne von 80 % der Läufe.
+  const trendViews = {};
+  function drawTrend(id, ser) {
+    const off = state.data.utc_offset_seconds, dl = state.data.daily;
+    const svg = $(id + 'Svg');
+    const n = Math.min(14, ser.time.length);
+    const W = Math.max(280, $(id + 'Chart').clientWidth);
     const small = W < 420;
     const HEAD = 22, CELL = small ? 26 : 30, PH = Math.round(Math.min(210, Math.max(150, W * 0.36)));
     const Hh = HEAD + PH + CELL + 2;
@@ -956,13 +1015,13 @@
     svg.setAttribute('width', W); svg.setAttribute('height', Hh);
     svg.replaceChildren();
     const cw = W / n, cx = j => (j + 0.5) * cw;
-    const mx = dl.temperature_2m_max.slice(0, n), mn = dl.temperature_2m_min.slice(0, n);
-    const lo = Math.min(...mn), hi = Math.max(...mx), span = Math.max(4, hi - lo);
+    const mx = ser.max.slice(0, n), mn = ser.min.slice(0, n);
+    const lo = Math.min(...mn, ...(ser.minLo || []).slice(0, n)), hi = Math.max(...mx, ...(ser.maxHi || []).slice(0, n));
+    const span = Math.max(4, hi - lo);
     const padT = 24, padB = 26;
     const yT = v => HEAD + padT + (hi - v) / span * (PH - padT - padB);
-    const day = j => new Date((dl.time[j] + off) * 1000);
+    const day = j => new Date((ser.time[j] + off) * 1000);
 
-    // Wochenende hinterlegen, Wochentage oben
     for (let j = 0; j < n; j++) {
       const wd = day(j).getUTCDay(), we = wd === 0 || wd === 6;
       if (we) el('rect', { x: j * cw, y: 0, width: cw, height: HEAD + PH, fill: css('--weekend') }, svg);
@@ -971,7 +1030,13 @@
       t.textContent = day(j).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' }).replace('.', '');
     }
 
-    // Verbindungslinien, Punkte, Zahlen
+    // Spannen der Läufe (nur Ensemble)
+    [[ser.maxLo, ser.maxHi, 'rgba(255,59,48,.13)'], [ser.minLo, ser.minHi, 'rgba(0,122,255,.13)']].forEach(([a, b, col]) => {
+      if (!a || !b) return;
+      const up = b.slice(0, n).map((v, j) => [cx(j), yT(v)]), dn = a.slice(0, n).map((v, j) => [cx(j), yT(v)]).reverse();
+      el('path', { d: monotonePath(up) + monotonePath(dn).replace(/^M/, 'L') + 'Z', fill: col }, svg);
+    });
+
     const fs = small ? 12 : 15;
     [[mx, css('--warm'), -8], [mn, css('--cold'), fs + 5]].forEach(([vals, col, dy]) => {
       el('path', { d: monotonePath(vals.map((v, j) => [cx(j), yT(v)])), fill: 'none', stroke: css('--trend-line'), 'stroke-width': 1.5 }, svg);
@@ -982,39 +1047,53 @@
       });
     });
 
-    // Zellen: Sonnenschein-Anteil als Gelb, Regenmenge als Tropfen
     const y0 = HEAD + PH + 2;
     const drop = (x, y, sc) => el('path', {
       d: 'M0,-7 C2.8,-3.2 4.6,-0.6 4.6,2 A4.6,4.6 0 1 1 -4.6,2 C-4.6,-0.6 -2.8,-3.2 0,-7 Z',
       transform: `translate(${x},${y}) scale(${sc})`, fill: css('--drop'), stroke: css('--drop-edge'), 'stroke-width': 0.9 / sc }, svg);
+    const daylight = t => { const i = dl.time.indexOf(t); return i >= 0 ? dl.daylight_duration[i] : 12 * 3600; };
     for (let j = 0; j < n; j++) {
-      const sunFrac = dl.daylight_duration[j] ? Math.min(1, (dl.sunshine_duration[j] || 0) / dl.daylight_duration[j]) : 0;
+      const sunFrac = Math.min(1, (ser.sun[j] || 0) / daylight(ser.time[j]));
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: css('--cell') }, svg);
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${(sunFrac * 0.85).toFixed(2)})` }, svg);
-      const r = dl.precipitation_sum[j] || 0, cyD = y0 + CELL / 2 + 1.5, sc = small ? 0.85 : 1;
+      const r = ser.rain[j] || 0, cyD = y0 + CELL / 2 + 1.5, sc = small ? 0.85 : 1;
       if (r >= 8) { drop(cx(j) - 3.5 * sc, cyD - 2, 0.95 * sc); drop(cx(j) + 3.5 * sc, cyD + 1.5, 1.15 * sc); }
       else if (r >= 2) drop(cx(j), cyD, 1.1 * sc);
       else if (r >= 0.2) drop(cx(j), cyD + 1, 0.75 * sc);
     }
-    trendView = { n, cw, W };
+    trendViews[id] = { n, cw, W, ser, daylight };
   }
 
-  function showTrendTip(ev) {
-    if (!trendView || !state.data) return;
-    const dl = state.data.daily, off = state.data.utc_offset_seconds;
-    const rect = $('trendSvg').getBoundingClientRect();
-    const j = Math.floor((ev.clientX - rect.left) * (trendView.W / rect.width) / trendView.cw);
-    if (j < 0 || j >= trendView.n) return hideTrendTip();
-    const date = new Date((dl.time[j] + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
-    const tip = $('trendTip');
-    tip.innerHTML = `<b>${date}</b> · <span style="color:var(--warm)">${fmt1(dl.temperature_2m_max[j])}°</span> / `
-      + `<span style="color:var(--cold)">${fmt1(dl.temperature_2m_min[j])}°</span>`
-      + ` · 💧 ${fmt1(dl.precipitation_sum[j] || 0)} mm · ☀︎ ${fmt1((dl.sunshine_duration[j] || 0) / 3600)} h von ${fmt1(dl.daylight_duration[j] / 3600)} h`;
+  function renderTrend() {
+    const dl = state.data.daily;
+    if (!dl.temperature_2m_max) { $('trendSvg').replaceChildren(); return; }
+    drawTrend('trend', { time: dl.time, max: dl.temperature_2m_max, min: dl.temperature_2m_min,
+      rain: dl.precipitation_sum, sun: dl.sunshine_duration });
+  }
+  function renderEns() {
+    if (!state.data || !state.ens) return;
+    $('ensStatus').style.display = 'none';
+    drawTrend('ens', state.ens);
+  }
+
+  function showTrendTip(id, ev) {
+    const v = trendViews[id];
+    if (!v || !state.data) return;
+    const off = state.data.utc_offset_seconds, ser = v.ser;
+    const rect = $(id + 'Svg').getBoundingClientRect();
+    const j = Math.floor((ev.clientX - rect.left) * (v.W / rect.width) / v.cw);
+    if (j < 0 || j >= v.n) return hideTrendTip(id);
+    const date = new Date((ser.time[j] + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+    const range = (a, b) => a && b ? ` <small>(${Math.round(a[j])}–${Math.round(b[j])})</small>` : '';
+    const tip = $(id + 'Tip');
+    tip.innerHTML = `<b>${date}</b> · <span style="color:var(--warm)">${fmt1(ser.max[j])}°</span>${range(ser.maxLo, ser.maxHi)} / `
+      + `<span style="color:var(--cold)">${fmt1(ser.min[j])}°</span>${range(ser.minLo, ser.minHi)}`
+      + ` · 💧 ${fmt1(ser.rain[j] || 0)} mm · ☀︎ ${fmt1((ser.sun[j] || 0) / 3600)} h von ${fmt1(v.daylight(ser.time[j]) / 3600)} h`;
     tip.style.display = 'block';
-    const tw = tip.offsetWidth, left = ((j + 0.5) * trendView.cw) * rect.width / trendView.W;
+    const tw = tip.offsetWidth, left = ((j + 0.5) * v.cw) * rect.width / v.W;
     tip.style.left = Math.min(rect.width - tw, Math.max(0, left - tw / 2)) + 'px';
   }
-  function hideTrendTip() { $('trendTip').style.display = 'none'; }
+  function hideTrendTip(id) { $(id + 'Tip').style.display = 'none'; }
 
   // ---------- Ort wählen ----------
   function setLoc(loc) {
@@ -1022,6 +1101,9 @@
     store.set('loc', loc);
     state.data = null;
     state.tide = null;
+    state.ens = null;
+    $('ensStatus').textContent = 'Lade Ensemble …';
+    $('ensStatus').style.display = 'flex';
     $('name').textContent = loc.name;
     $('status').textContent = 'Lade Wetterdaten …';
     load();
@@ -1144,10 +1226,13 @@
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#svg')) hideTip(); });
 
   new ResizeObserver(() => render()).observe($('chart'));
-  $('trendSvg').addEventListener('pointermove', showTrendTip);
-  $('trendSvg').addEventListener('pointerdown', showTrendTip);
-  $('trendSvg').addEventListener('pointerleave', hideTrendTip);
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('#trendSvg')) hideTrendTip(); });
+  ['trend', 'ens'].forEach(id => {
+    const el2 = $(id + 'Svg');
+    el2.addEventListener('pointermove', e => showTrendTip(id, e));
+    el2.addEventListener('pointerdown', e => showTrendTip(id, e));
+    el2.addEventListener('pointerleave', () => hideTrendTip(id));
+    document.addEventListener('pointerdown', e => { if (!e.target.closest('#' + id + 'Svg')) hideTrendTip(id); });
+  });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 
   // Wie ein Widget: jede Minute „Jetzt“ nachziehen, alle 60 Minuten neu laden –
