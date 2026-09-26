@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- App-Icon, angelehnt an die Stundengrafik: Nacht → Dämmerung → Tag, Wolken-Spindel,
+       Regenbalken, rote Temperaturkurve und Sonne. iOS rundet die Ecken selbst ab. -->
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#2c2c2c"/>
+      <stop offset=".34" stop-color="#2c2c2c"/>
+      <stop offset=".5" stop-color="#e8e8e8"/>
+      <stop offset="1" stop-color="#e8e8e8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+
+  <!-- dezentes Stundenraster -->
+  <g stroke="rgba(128,128,128,.22)" stroke-width="4">
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+  </g>
+
+  <!-- Wolken-Spindel oben (hell = hohe, dunkel = tiefe Wolken) -->
+  <path d="M150 92 C215 92 250 40 320 40 S430 92 512 92 L512 92 C430 92 390 150 320 150 S215 92 150 92Z" fill="rgba(200,200,200,.95)"/>
+  <path d="M190 92 C240 92 270 70 320 70 S410 92 480 92 C410 92 370 128 320 128 S240 92 190 92Z" fill="rgba(140,140,140,.95)"/>
+  <path d="M240 92 C275 92 295 84 320 84 S370 92 420 92 C370 92 345 112 320 112 S275 92 240 92Z" fill="rgba(90,90,90,.95)"/>
+
+  <!-- Regenbalken in der Nacht -->
+  <g fill="rgba(10,132,255,.6)">
+    <rect x="34" y="400" width="44" height="112"/>
+    <rect x="96" y="344" width="44" height="168"/>
+  </g>
+  <rect x="96" y="344" width="44" height="40" fill="rgba(10,100,230,.95)"/>
+
+  <!-- Sonne im Tag -->
+  <circle cx="404" cy="372" r="46" fill="#ffd60a"/>
+
+  <!-- Temperaturkurve -->
+  <path d="M-10 318 C60 322 120 350 190 318 S300 150 360 176 S470 214 522 196"
+        fill="none" stroke="#ff3b30" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
