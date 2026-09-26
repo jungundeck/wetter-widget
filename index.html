@@ -26,7 +26,7 @@
     --weekend: rgba(90,130,190,.10);
     --trend-line: #c3cdd6;
     --cell: #ececec;
-    --sun: 255,214,10;                   /* Sonnenschein (RGB, Deckkraft = Anteil) */
+    --sun: 252,242,40;                   /* Sonnenschein (RGB, Deckkraft = Anteil) */
     --snow: rgba(175,82,222,.45);        /* Schnee bis 5 mm Wasser */
     --snow-strong: rgba(150,60,210,.92); /* Schnee-Anteil über 5 mm */
     --drop: #8dbdf5;
@@ -1059,6 +1059,10 @@
       const up = b.slice(0, n).map((v, j) => [cx(j), yT(v)]), dn = a.slice(0, n).map((v, j) => [cx(j), yT(v)]).reverse();
       el('path', { d: monotonePath(up) + monotonePath(dn).replace(/^M/, 'L') + 'Z', fill: col }, svg);
     });
+
+    // 0-°C-Linie (fein gestrichelt), wenn sie im sichtbaren Bereich liegt
+    if (yT(0) > HEAD + 4 && yT(0) < HEAD + PH - 2)
+      el('line', { x1: 0, x2: W, y1: yT(0), y2: yT(0), stroke: 'rgba(128,128,128,.8)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }, svg);
 
     // Niederschlagsbalken (dünn, ohne Skala) hinter den Kurven, gleiche Stufenskala wie oben
     const bw = Math.max(3, cw * 0.32);
