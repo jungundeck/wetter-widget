@@ -139,6 +139,19 @@
 
   /* Bedienelemente */
   .controls { margin-top: 16px; display: grid; gap: 12px; }
+  .tabs {
+    display: flex; gap: 6px; overflow-x: auto; padding: 0 0 12px; margin: 0 -2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: none; display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 18px; padding: 6px 13px; white-space: nowrap; color: var(--text);
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .tab .x { margin-left: 4px; font-size: 13px; opacity: .75; }
+  .tab.edit { color: var(--accent); padding: 6px 11px; }
+  .tab.edit.on { background: var(--accent); color: #fff; }
   .settings {
     background: var(--input); border: 1px solid var(--border); border-radius: 10px;
   }
@@ -155,6 +168,7 @@
     .widget { padding: 12px 10px 8px; border-radius: 18px; }
     .head { padding: 0 2px 8px; }
     .head .line1 { font-size: 16px; }
+    .tab { padding: 6px 11px; font-size: 15px; }
     button, input[type=search] { font-size: 16px; } /* verhindert Auto-Zoom in iOS Safari */
   }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -189,6 +203,7 @@
 </head>
 <body>
 <main>
+  <nav class="tabs" id="tabs" aria-label="Gespeicherte Orte"></nav>
   <section class="widget" aria-label="Wetter-Widget">
     <div class="head">
       <div class="line1">
@@ -211,25 +226,13 @@
         <input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" aria-label="Ort suchen">
         <ul class="results" id="results" role="listbox"></ul>
       </div>
-      <button id="gps" class="icon" title="Mein Standort" aria-label="Mein Standort">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 3.5 3.8 10.6c-.8.3-.7 1.5.1 1.7l6.6 1.2 1.2 6.6c.2.8 1.4.9 1.7.1z" fill="currentColor"/></svg>
-      </button>
       <button id="reload" class="icon" title="Aktualisieren" aria-label="Aktualisieren">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
-    <details class="settings" id="settings">
-      <summary>⚙︎ Einstellungen</summary>
-      <div class="opts">
-        <label><input type="checkbox" data-opt="tide"> Tide <small>(nur am Meer)</small></label>
-        <label><input type="checkbox" data-opt="uv"> UV-Index</label>
-        <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
-        <label><input type="checkbox" data-opt="clouds"> Wolken</label>
-      </div>
-    </details>
   </section>
 
-  <details class="widget trend" id="trendBox" open aria-label="14-Tage-Trend">
+  <details class="widget trend" id="trendBox" aria-label="14-Tage-Trend">
     <summary><h2>14-Tage-Trend</h2></summary>
     <div class="chart" id="trendChart">
       <svg id="trendSvg" role="img" aria-label="Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
@@ -243,7 +246,7 @@
     </div>
   </details>
 
-  <details class="widget trend" id="ensBox" open aria-label="14-Tage-Trend Ensemble-Mittel">
+  <details class="widget trend" id="ensBox" aria-label="14-Tage-Trend Ensemble-Mittel">
     <summary><h2>14-Tage-Trend · Ensemble-Mittel <small>(ECMWF, 51 Läufe)</small></h2></summary>
     <div class="chart" id="ensChart">
       <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
@@ -258,6 +261,18 @@
       <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
     </div>
   </details>
+
+  <section class="controls">
+    <details class="settings" id="settings">
+      <summary>⚙︎ Einstellungen</summary>
+      <div class="opts">
+        <label><input type="checkbox" data-opt="tide"> Tide <small>(nur am Meer)</small></label>
+        <label><input type="checkbox" data-opt="uv"> UV-Index</label>
+        <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
+        <label><input type="checkbox" data-opt="clouds"> Wolken</label>
+      </div>
+    </details>
+  </section>
 
   <p class="note">
     Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
@@ -279,6 +294,8 @@
 
   const state = {
     loc: store.get('loc') || DEFAULT_LOC,
+    favs: store.get('favs') || [DEFAULT_LOC], // gespeicherte Orte (Register), nur lokal
+    editTabs: false,
     data: null,
     tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
     fetchedAt: null,
@@ -1132,6 +1149,49 @@
   }
   function hideTrendTip(id) { $(id + 'Tip').style.display = 'none'; }
 
+  // ---------- Register mit gespeicherten Orten ----------
+  // „📍 Standort“ + Favoriten; Daten werden nur für den angeklickten Ort abgerufen.
+  // Ein Ort aus der Suche wird automatisch als Register gespeichert; ✎ schaltet das Entfernen (×) ein.
+  const locKey = l => l.lat.toFixed(2) + ',' + l.lon.toFixed(2);
+  function renderTabs() {
+    const cur = locKey(state.loc);
+    const mk = (label, active, title) => {
+      const b = document.createElement('button');
+      b.className = 'tab' + (active ? ' active' : '');
+      b.textContent = label;
+      if (title) b.title = title;
+      return b;
+    };
+    const gpsTab = mk(state.loc.gps ? '📍 ' + state.loc.name : '📍 Standort', !!state.loc.gps, 'Aktuellen Standort verwenden');
+    gpsTab.id = 'gps';
+    gpsTab.addEventListener('click', locate);
+    const tabs = [gpsTab];
+    state.favs.forEach((f, i) => {
+      const b = mk(f.name, !state.loc.gps && locKey(f) === cur, [f.name, f.region].filter(Boolean).join(', '));
+      if (state.editTabs) {
+        const x = document.createElement('span');
+        x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', f.name + ' entfernen');
+        b.appendChild(x);
+      }
+      b.addEventListener('click', () => {
+        if (state.editTabs) { state.favs.splice(i, 1); store.set('favs', state.favs); renderTabs(); }
+        else if (locKey(f) !== cur || state.loc.gps) setLoc(f);
+      });
+      tabs.push(b);
+    });
+    const ed = mk('✎', false, state.editTabs ? 'Fertig' : 'Orte bearbeiten');
+    ed.classList.add('edit');
+    if (state.editTabs) ed.classList.add('on');
+    ed.addEventListener('click', () => { state.editTabs = !state.editTabs; renderTabs(); });
+    tabs.push(ed);
+    $('tabs').replaceChildren(...tabs);
+    const act = $('tabs').querySelector('.tab.active');
+    if (act) act.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  function addFav(loc) {
+    if (!state.favs.some(f => locKey(f) === locKey(loc))) { state.favs.push(loc); store.set('favs', state.favs); }
+  }
+
   // ---------- Ort wählen ----------
   function setLoc(loc) {
     state.loc = loc;
@@ -1143,6 +1203,7 @@
     $('ensStatus').style.display = 'flex';
     $('name').textContent = loc.name;
     $('status').textContent = 'Lade Wetterdaten …';
+    renderTabs();
     load();
   }
 
@@ -1187,14 +1248,15 @@
     if (!g) return;
     $('results').replaceChildren();
     $('q').value = '';
-    setLoc({ name: g.name, region: [g.admin2, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude });
+    const loc = { name: g.name, region: [g.admin2, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude };
+    addFav(loc);
+    setLoc(loc);
   }
 
-  $('gps').addEventListener('click', () => {
+  function locate() {
     if (!navigator.geolocation) return alert('Standortbestimmung wird nicht unterstützt.');
     $('gps').disabled = true;
     navigator.geolocation.getCurrentPosition(async pos => {
-      $('gps').disabled = false;
       const lat = +pos.coords.latitude.toFixed(4), lon = +pos.coords.longitude.toFixed(4);
       let name = 'Mein Standort', region = '';
       try {
@@ -1203,12 +1265,12 @@
         name = j.city || j.locality || name;
         region = j.principalSubdivision || '';
       } catch {}
-      setLoc({ name, region, lat, lon });
+      setLoc({ name, region, lat, lon, gps: true });
     }, err => {
       $('gps').disabled = false;
       alert('Standort nicht verfügbar: ' + err.message);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
-  });
+  }
 
   $('reload').addEventListener('click', () => load(true)); // Knopf lädt auch das Ensemble neu
 
@@ -1266,7 +1328,7 @@
   // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
   const boxes = store.get('boxes') || {};
   ['trendBox', 'ensBox'].forEach(id => {
-    if (boxes[id] === false) $(id).open = false;
+    if (boxes[id] === true) $(id).open = true; // Standard: zugeklappt
     $(id).addEventListener('toggle', () => {
       boxes[id] = $(id).open; store.set('boxes', boxes);
       if ($(id).open && state.data) { if (id === 'trendBox') renderTrend(); else if (state.ens) renderEns(); else loadEns(); }
@@ -1293,6 +1355,8 @@
   document.addEventListener('visibilitychange', tick);
 
   $('name').textContent = state.loc.name;
+  if (!state.loc.gps) addFav(state.loc); // zuletzt gewählter Ort erscheint immer als Register
+  renderTabs();
   load();
 })();
 </script>
