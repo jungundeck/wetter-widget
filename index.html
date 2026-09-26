@@ -151,6 +151,9 @@
   .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   .tab .x { margin-left: 4px; font-size: 13px; opacity: .75; }
   .tab.edit { color: var(--accent); padding: 6px 11px; }
+  .tab.gpsTab { padding: 5px 9px; color: var(--accent); }
+  .tab.gpsTab.active { color: #fff; }
+  .tab.gpsTab svg { width: 20px; height: 20px; display: block; }
   .tab.edit.on { background: var(--accent); color: #fff; }
   .settings {
     background: var(--input); border: 1px solid var(--border); border-radius: 10px;
@@ -1151,7 +1154,7 @@
 
   // ---------- Register mit gespeicherten Orten ----------
   // „📍 Standort“ + Favoriten; Daten werden nur für den angeklickten Ort abgerufen.
-  // Ein Ort aus der Suche wird automatisch als Register gespeichert; ✎ schaltet das Entfernen (×) ein.
+  // Speichern nur über „+“ (aktueller Ort); ✎ schaltet das Entfernen (✕) ein.
   const locKey = l => l.lat.toFixed(2) + ',' + l.lon.toFixed(2);
   function renderTabs() {
     const cur = locKey(state.loc);
@@ -1162,8 +1165,12 @@
       if (title) b.title = title;
       return b;
     };
-    const gpsTab = mk(state.loc.gps ? '📍 ' + state.loc.name : '📍 Standort', !!state.loc.gps, 'Aktuellen Standort verwenden');
+    const gpsTab = mk('', !!state.loc.gps, state.loc.gps ? 'Aktueller Standort: ' + state.loc.name : 'Aktuellen Standort verwenden');
     gpsTab.id = 'gps';
+    gpsTab.classList.add('gpsTab');
+    gpsTab.setAttribute('aria-label', 'Aktueller Standort');
+    gpsTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/>'
+      + '<circle cx="12" cy="12" r="2.3" fill="currentColor"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     gpsTab.addEventListener('click', locate);
     const tabs = [gpsTab];
     state.favs.forEach((f, i) => {
@@ -1179,6 +1186,16 @@
       });
       tabs.push(b);
     });
+    if (!state.favs.some(f => locKey(f) === cur)) {
+      const add = mk('+', false, state.loc.name + ' als Register speichern');
+      add.classList.add('edit');
+      add.addEventListener('click', () => {
+        const { gps, ...loc } = state.loc; // gespeicherter Standort wird ein normales Register
+        if (gps) { state.loc = loc; store.set('loc', loc); }
+        addFav(loc); renderTabs();
+      });
+      tabs.push(add);
+    }
     const ed = mk('✎', false, state.editTabs ? 'Fertig' : 'Orte bearbeiten');
     ed.classList.add('edit');
     if (state.editTabs) ed.classList.add('on');
@@ -1249,7 +1266,6 @@
     $('results').replaceChildren();
     $('q').value = '';
     const loc = { name: g.name, region: [g.admin2, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude };
-    addFav(loc);
     setLoc(loc);
   }
 
@@ -1355,7 +1371,6 @@
   document.addEventListener('visibilitychange', tick);
 
   $('name').textContent = state.loc.name;
-  if (!state.loc.gps) addFav(state.loc); // zuletzt gewählter Ort erscheint immer als Register
   renderTabs();
   load();
 })();
