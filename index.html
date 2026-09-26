@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wetter-Widget</title>
+<style>
+  :root {
+    --bg: #f2f2f7;
+    --card: #ffffff;
+    --text: #1c1c1e;
+    --muted: #6e6e73;
+    --border: #d1d1d6;
+    --input: #ffffff;
+    --accent: #007aff;
+    --shadow: 0 8px 30px rgba(0,0,0,.08);
+    /* Grafik-Farben laut Projektplan */
+    --day: #e8e8e8;
+    --night: #2c2c2c;
+    --warm: #ff3b30;
+    --cold: #007aff;
+    --rain: rgba(10,132,255,.4);        /* Regen bis 5 mm/h */
+    --rain-strong: rgba(10,100,230,.92); /* Starkregen-Anteil über 5 mm/h */
+    --rain-prob: 10,132,255;             /* Wahrscheinlichkeits-Leiste (RGB, Deckkraft = %) */
+    --uv: #ffcc00;
+    --tide: #1fa9c4;
+    /* Wolken: hoch = hell, mittel, tief = dunkel */
+    --cloud-high: rgba(205,205,205,.9);
+    --cloud-mid: rgba(145,145,145,.85);
+    --cloud-low: rgba(95,95,95,.9);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f2f2f7;
+      --muted: #98989d;
+      --border: #38383a;
+      --input: #2c2c2e;
+      --accent: #0a84ff;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  /* Widget-Karte */
+  .widget {
+    background: var(--card);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 14px 14px 10px;
+    position: relative;
+  }
+  .head { padding: 0 4px 10px; }
+  .head .line1 {
+    display: flex; align-items: baseline; flex-wrap: wrap;
+    font-size: 17px; font-weight: 600; white-space: nowrap;
+  }
+  .head .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .head .now { font-variant-numeric: tabular-nums; }
+  .head .now .sep { color: var(--border); margin: 0 6px; font-weight: 400; }
+  .head .now .h { color: var(--muted); font-weight: 500; }
+  .head .elev { color: var(--muted); font-weight: 400; margin-left: 5px; }
+  .head .now { margin-left: 10px; }
+  .head .updated { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .head .updated > span + span::before { content: "·"; margin: 0 6px; }
+
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+  .axis text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .axis .sun { font-size: 10px; }
+  .wind { font-size: 9px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .axis .strong { fill: var(--text); font-weight: 600; }
+
+  .tip {
+    position: absolute; top: 4px; pointer-events: none;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px 8px; font-size: 12px; max-width: min(100%, 520px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    font-variant-numeric: tabular-nums;
+    display: none;
+  }
+  .tip b { font-weight: 600; }
+
+  .status {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 14px; text-align: center; padding: 20px;
+  }
+
+  /* Bedienelemente */
+  .controls { margin-top: 20px; display: grid; gap: 12px; }
+  .settings {
+    background: var(--input); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .settings summary { padding: 9px 12px; cursor: pointer; color: var(--accent); list-style: none; }
+  .settings summary::-webkit-details-marker { display: none; }
+  .settings summary::after { content: "▾"; float: right; color: var(--muted); }
+  .settings[open] summary::after { content: "▴"; }
+  .settings .opts { display: grid; gap: 2px; padding: 0 12px 10px; }
+  .settings label { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; }
+  .settings input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  .settings small { color: var(--muted); }
+  @media (max-width: 480px) {
+    main { padding: 12px 10px 32px; }
+    .widget { padding: 12px 10px 8px; border-radius: 18px; }
+    .head { padding: 0 2px 8px; }
+    .head .line1 { font-size: 16px; }
+    button, input[type=search] { font-size: 16px; } /* verhindert Auto-Zoom in iOS Safari */
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .search { position: relative; flex: 1 1 160px; }
+  input[type=search] {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+    background: var(--input); border: 1px solid var(--border); border-radius: 10px;
+  }
+  input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit; color: var(--accent); background: var(--input);
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  .results {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+    list-style: none; margin: 0; padding: 4px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  }
+  .results:empty { display: none; }
+  .results li { padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+  .results li:hover, .results li.active { background: var(--bg); }
+  .results small { color: var(--muted); }
+  .label { color: var(--muted); font-size: 13px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  .note a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <section class="widget" aria-label="Wetter-Widget">
+    <div class="head">
+      <div class="line1">
+        <span class="name" id="name">–</span><span class="elev" id="elev"></span>
+        <span class="now"><span class="t" id="curT">–</span><span class="sep">|</span><span class="h" id="curH">–</span></span>
+      </div>
+      <div class="updated" id="updated">Zuletzt: –</div>
+    </div>
+    <div class="chart" id="chart">
+      <svg id="svg" role="img" aria-label="Temperatur und Niederschlag der nächsten 24 Stunden"></svg>
+      <div class="tip" id="tip"></div>
+      <div class="status" id="status">Lade Wetterdaten …</div>
+    </div>
+  </section>
+
+  <section class="controls">
+    <div class="row">
+      <div class="search">
+        <input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" aria-label="Ort suchen">
+        <ul class="results" id="results" role="listbox"></ul>
+      </div>
+      <button id="gps" title="Aktuellen Standort verwenden">📍 Mein Standort</button>
+    </div>
+    <details class="settings" id="settings">
+      <summary>⚙︎ Einstellungen</summary>
+      <div class="opts">
+        <label><input type="checkbox" data-opt="tide"> Tide <small>(nur am Meer)</small></label>
+        <label><input type="checkbox" data-opt="uv"> UV-Index</label>
+        <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
+        <label><input type="checkbox" data-opt="clouds"> Wolken</label>
+      </div>
+    </details>
+    <div class="row">
+      <button id="reload" title="Neu laden">↻ Aktualisieren</button>
+    </div>
+  </section>
+
+  <p class="note">
+    Daten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (stündlich, Zeitzone des Orts).
+    Hintergrund hell = Tag, dunkel = Nacht (Sonnenauf-/-untergang am Ort). Verlauf = Dämmerung (bis Sonne 6° unter Horizont). Temperatur rot &gt; 0 °C, blau &lt; 0 °C, gestrichelt = gefühlte Temperatur, gelb = UV-Index. Türkise Linie unten (nur am Meer) = Tide mit Hoch-/Niedrigwasser (HW/NW), 🌊 ± = halber Tidenhub (Modellwerte, nicht für die Navigation). Mond: Phase, Beleuchtung und Auf-/Untergang in der Kopfzeile, bei Mondschein ist die Nacht etwas heller. ❄︎ = Schneefallgrenze, wenn sie nahe an die Höhe des Orts kommt. Symbole auf der Kurve = Wetter alle 2 h. Dünne senkrechte Linien = Mitternacht und Mittag. Blaue Balken = Regenmenge (mm/h, bis 5 mm feine Skala in der unteren Hälfte, darüber gestaucht bis 50 mm und kräftiges Blau); blaue Leiste unter der Grafik = Regenwahrscheinlichkeit (je kräftiger, desto wahrscheinlicher). Graue Spindel oben = Bewölkung (Dicke = Gesamtbedeckung; Anteile von oben nach unten: hell = hohe, mittel = mittelhohe, dunkel = tiefe Wolken). Pfeile unten = Wind (zeigt, wohin er weht; km/h, ↯ = Böen; grau schwach, grün mäßig, orange frisch, rot stürmisch).
+  </p>
+</main>
+
+<script>
+(() => {
+  const DEFAULT_LOC = { name: 'Untrasried', region: 'Ostallgäu, Bayern', lat: 47.8333, lon: 10.3833 };
+  const H = 3600, DAY = 86400;
+  const $ = id => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem('wetterwidget.' + k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem('wetterwidget.' + k, JSON.stringify(v)); } catch {} },
+  };
+
+  const state = {
+    loc: store.get('loc') || DEFAULT_LOC,
+    data: null,
+    tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
+    fetchedAt: null,
+    lastAttempt: 0,
+    // Anzeige-Einstellungen, lokal gespeichert
+    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true }, store.get('opts') || {}),
+  };
+
+  // Orte ohne Tide-Daten (Binnenland) merken, damit die Meeres-Anfrage dort entfällt
+  const tideKey = loc => loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2);
+  const noTide = new Set(store.get('notide') || []);
+
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const fmt1 = v => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  // ---------- Daten ----------
+  async function load() {
+    const { lat, lon } = state.loc;
+    state.lastAttempt = Date.now();
+    $('status').style.display = state.data ? 'none' : 'flex';
+    const url = 'https://api.open-meteo.com/v1/forecast'
+      + `?latitude=${lat}&longitude=${lon}`
+      + '&hourly=temperature_2m,precipitation_probability,precipitation,uv_index,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,apparent_temperature,freezing_level_height'
+      + '&daily=sunrise,sunset'
+      + '&current=temperature_2m,relative_humidity_2m'
+      + '&timezone=auto&timeformat=unixtime&forecast_days=3';
+    // Tide (Meeresspiegel inkl. Gezeiten) aus dem Meeresmodell; im Binnenland nur leere Werte
+    const tideUrl = 'https://marine-api.open-meteo.com/v1/marine'
+      + `?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl&timezone=auto&timeformat=unixtime&forecast_days=3`;
+    const key = tideKey(state.loc);
+    const wantTide = state.opts.tide && !noTide.has(key);
+    const tideReq = wantTide ? fetch(tideUrl).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const [data, tj] = await Promise.all([r.json(), tideReq]);
+      const th = tj && tj.hourly && tj.hourly.sea_level_height_msl;
+      state.tide = th && th.some(v => v != null) ? { t: tj.hourly.time, h: th } : null;
+      if (th && !state.tide) { noTide.add(key); store.set('notide', [...noTide]); } // Antwort ohne Werte = kein Meer
+      state.data = data;
+      state.fetchedAt = new Date();
+      $('status').style.display = 'none';
+      render();
+    } catch (e) {
+      $('status').textContent = 'Wetterdaten konnten nicht geladen werden (' + e.message + ').';
+      $('status').style.display = 'flex';
+    }
+  }
+
+  // ---------- Kopfzeile ----------
+  function renderHeader() {
+    const d = state.data;
+    $('name').textContent = state.loc.name;
+    $('name').title = [state.loc.name, state.loc.region].filter(Boolean).join(', ');
+    const nowS = Date.now() / 1000, off = d.utc_offset_seconds;
+    const span = (text, title) => { const e = document.createElement('span'); e.textContent = text; if (title) e.title = title; return e; };
+    const parts = [span('Zuletzt: ' + state.fetchedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))];
+
+    // Mond: Phase, beleuchteter Anteil, nächster Auf- und Untergang (innerhalb 24 h)
+    const mi = Moon.illumination(nowS), pct = Math.round(mi.fraction * 100);
+    const ev = Moon.riseSet(nowS, nowS + DAY, state.loc.lat, state.loc.lon);
+    parts.push(span(`${Moon.emoji(mi.phase)} ${pct} %` + ev.map(e => (e.rise ? '  ↑ ' : '  ↓ ') + hhmm(e.t, off)).join(''),
+      `Mond: ${Moon.name(mi.phase)}, ${pct} % beleuchtet` + ev.map(e => `, ${e.rise ? 'Aufgang' : 'Untergang'} ${hhmm(e.t, off)}`).join('')));
+
+    // Schneefallgrenze ≈ Nullgradgrenze − 300 m; nur zeigen, wenn sie in den nächsten 24 h
+    // bis auf 500 m an die Höhe des Orts herankommt
+    const fz = d.hourly.freezing_level_height;
+    if (fz && d.elevation != null) {
+      const i0 = d.hourly.time.findIndex(t => t + H > nowS);
+      const next = fz.slice(Math.max(0, i0), i0 + 25).filter(v => v != null);
+      if (next.length) {
+        const snow = Math.max(0, Math.min(...next) - 300);
+        if (snow <= d.elevation + 500)
+          parts.push(span(`❄︎ ab ${Math.floor(snow / 100) * 100} m`,
+            `Schneefallgrenze (geschätzt aus Nullgradgrenze − 300 m), tiefster Wert der nächsten 24 h. Ort liegt auf ${Math.round(d.elevation)} m.`));
+      }
+    }
+    // Tide: halber Tidenhub der nächsten 24 h als ±-Wert (nur am Meer)
+    if (state.tide && state.opts.tide) {
+      const hs = state.tide.t.map((t, j) => t + H > nowS && t <= nowS + DAY ? state.tide.h[j] : null).filter(v => v != null);
+      if (hs.length > 1) {
+        const hub = Math.max(...hs) - Math.min(...hs);
+        parts.push(span(`🌊 ±${fmt1(hub / 2)} m`, `Tidenhub ${fmt1(hub)} m in den nächsten 24 h (Modellwert, nicht für die Navigation)`));
+      }
+    }
+    $('updated').replaceChildren(...parts);
+    $('curT').textContent = fmt1(d.current.temperature_2m) + ' °C';
+    $('curH').textContent = Math.round(d.current.relative_humidity_2m) + ' %';
+    $('elev').textContent = d.elevation != null ? `(${Math.round(d.elevation).toLocaleString('de-DE')} m):` : ':';
+    $('elev').title = 'Höhe des Orts über dem Meer';
+  }
+
+  // ---------- Grafik ----------
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Monotone kubische Interpolation (Fritsch–Carlson): glatt, ohne Überschwinger
+  function monotonePath(pts) {
+    const n = pts.length;
+    if (n < 2) return '';
+    const dx = [], m = [], t = new Array(n);
+    for (let i = 0; i < n - 1; i++) {
+      dx[i] = pts[i + 1][0] - pts[i][0];
+      m[i] = (pts[i + 1][1] - pts[i][1]) / dx[i];
+    }
+    t[0] = m[0]; t[n - 1] = m[n - 2];
+    for (let i = 1; i < n - 1; i++) {
+      if (m[i - 1] * m[i] <= 0) t[i] = 0;
+      else {
+        const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+        t[i] = (w1 + w2) / (w1 / m[i - 1] + w2 / m[i]);
+      }
+    }
+    let p = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h = dx[i] / 3;
+      p += `C${pts[i][0] + h},${pts[i][1] + h * t[i]} ${pts[i + 1][0] - h},${pts[i + 1][1] - h * t[i + 1]} ${pts[i + 1][0]},${pts[i + 1][1]}`;
+    }
+    return p;
+  }
+
+  function niceStep(range, target) {
+    const raw = range / target;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / pow;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
+  }
+
+  // Sonnenhöhe in Grad (vereinfachte Sonnenbahn, Genauigkeit ~0,1°) – für die Dämmerung
+  function sunElevation(t, lat, lon) {
+    const rad = Math.PI / 180;
+    const d = (t - 946728000) / DAY; // Tage seit J2000.0
+    const g = (357.529 + 0.98560028 * d) * rad;
+    const q = 280.459 + 0.98564736 * d;
+    const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+    const e = (23.439 - 0.00000036 * d) * rad;
+    const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+    const dec = Math.asin(Math.sin(e) * Math.sin(L));
+    const gmst = (18.697374558 + 24.06570982441908 * d) % 24;
+    const ha = (gmst * 15 + lon) * rad - ra;
+    return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+  }
+
+  // Mondstand und Mondphase (vereinfachte Mondbahn nach SunCalc von V. Agafonkin, BSD-Lizenz)
+  const Moon = (() => {
+    const rad = Math.PI / 180, e = rad * 23.4397;
+    const toDays = t => t / DAY - 10957.5; // Tage seit J2000.0
+    const ra = (l, b) => Math.atan2(Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
+    const dec = (l, b) => Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
+    const moonCoords = d => {
+      const L = rad * (218.316 + 13.176396 * d), M = rad * (134.963 + 13.064993 * d), F = rad * (93.272 + 13.229350 * d);
+      const l = L + rad * 6.289 * Math.sin(M), b = rad * 5.128 * Math.sin(F);
+      return { ra: ra(l, b), dec: dec(l, b), dist: 385001 - 20905 * Math.cos(M) };
+    };
+    const sunCoords = d => {
+      const M = rad * (357.5291 + 0.98560028 * d);
+      const C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+      const L = M + C + rad * 102.9372 + Math.PI;
+      return { ra: ra(L, 0), dec: dec(L, 0) };
+    };
+    // Höhe über dem Horizont in Grad (ohne Refraktion)
+    const altitude = (t, lat, lon) => {
+      const d = toDays(t), c = moonCoords(d), phi = rad * lat;
+      const H = rad * (280.16 + 360.9856235 * d) + rad * lon - c.ra;
+      return Math.asin(Math.sin(phi) * Math.sin(c.dec) + Math.cos(phi) * Math.cos(c.dec) * Math.cos(H)) / rad;
+    };
+    // beleuchteter Anteil 0…1 und Phase 0…1 (0 = Neumond, 0,5 = Vollmond)
+    const illumination = t => {
+      const d = toDays(t), s = sunCoords(d), m = moonCoords(d), sdist = 149598000;
+      const phi = Math.acos(Math.sin(s.dec) * Math.sin(m.dec) + Math.cos(s.dec) * Math.cos(m.dec) * Math.cos(s.ra - m.ra));
+      const inc = Math.atan2(sdist * Math.sin(phi), m.dist - sdist * Math.cos(phi));
+      const angle = Math.atan2(Math.cos(s.dec) * Math.sin(s.ra - m.ra),
+        Math.sin(s.dec) * Math.cos(m.dec) - Math.cos(s.dec) * Math.sin(m.dec) * Math.cos(s.ra - m.ra));
+      return { fraction: (1 + Math.cos(inc)) / 2, phase: 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / Math.PI };
+    };
+    // Auf- und Untergänge im Zeitraum [a, b]: Nulldurchgänge der Höhe (Mondmitte +0,133°), 10-min-Raster
+    const riseSet = (a, b, lat, lon) => {
+      const out = [], h0 = 0.133;
+      let tp = a, hp = altitude(a, lat, lon) - h0;
+      for (let t = a + 600; t <= b; t += 600) {
+        const h = altitude(t, lat, lon) - h0;
+        if ((hp < 0) !== (h < 0)) out.push({ t: tp + (t - tp) * hp / (hp - h), rise: h > 0 });
+        tp = t; hp = h;
+      }
+      return out;
+    };
+    const EMOJI = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+    const NAMES = ['Neumond', 'zunehmende Sichel', 'erstes Viertel', 'zunehmender Mond', 'Vollmond', 'abnehmender Mond', 'letztes Viertel', 'abnehmende Sichel'];
+    const phaseIdx = p => Math.round(p * 8) % 8;
+    return { altitude, illumination, riseSet, emoji: p => EMOJI[phaseIdx(p)], name: p => NAMES[phaseIdx(p)] };
+  })();
+
+  const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, f) => 'rgb(' + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(',') + ')';
+  const hhmm = (t, off) => new Date((t + off) * 1000).toISOString().slice(11, 16);
+
+  // Windfarbe nach Stärke (km/h, grob nach Beaufort): schwach grau, mäßig grün, frisch orange, stürmisch rot
+  const CLOUD_MAX_PX = 43; // max. Dicke der Wolken-Spindel in px
+
+  // WMO-Wettercode → Symbol (Tag / Nacht) und Beschreibung
+  const WMO = [
+    [[0], '☀️', '🌙', 'klar'],
+    [[1], '🌤️', '🌙', 'überwiegend klar'],
+    [[2], '⛅', '☁️', 'teilweise bewölkt'],
+    [[3], '☁️', '☁️', 'bedeckt'],
+    [[45, 48], '🌫️', '🌫️', 'Nebel'],
+    [[51, 53, 55], '🌦️', '🌧️', 'Nieselregen'],
+    [[56, 57], '🌧️', '🌧️', 'gefrierender Niesel'],
+    [[61, 63, 65], '🌧️', '🌧️', 'Regen'],
+    [[66, 67], '🌧️', '🌧️', 'gefrierender Regen'],
+    [[71, 73, 75, 77], '🌨️', '🌨️', 'Schnee'],
+    [[80, 81, 82], '🌦️', '🌧️', 'Regenschauer'],
+    [[85, 86], '🌨️', '🌨️', 'Schneeschauer'],
+    [[95, 96, 99], '⛈️', '⛈️', 'Gewitter'],
+  ];
+  const wmo = c => WMO.find(([cs]) => cs.includes(c)) || null;
+
+  const windColor = v => v < 12 ? '#8e8e93' : v < 29 ? '#34c759' : v < 50 ? '#ff9500' : '#ff3b30';
+  const compass = deg => ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
+
+  let view = null; // für Tooltip
+
+  function renderChart() {
+    const d = state.data;
+    const off = d.utc_offset_seconds;
+    const svg = $('svg');
+    const W = Math.max(280, $('chart').clientWidth);
+    const WIND_H = 20; // Höhe der Wind-Leiste unter der Zeitachse
+    const PROB_H = 6; // Leiste für Regenwahrscheinlichkeit direkt unter der Grafik
+    const Hh = Math.round(Math.min(306, Math.max(180, W * 0.56))) + WIND_H + PROB_H;
+    svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', Hh);
+    svg.replaceChildren();
+
+    const m = { l: 32, r: 36, t: 20, b: 24 + WIND_H + PROB_H }; // oben Platz für Sonnenauf-/-untergang
+    const pw = W - m.l - m.r, ph = Hh - m.t - m.b;
+
+    // Zeitfenster: Beginn der aktuellen Stunde (Ortszeit) bis +24 h
+    const nowS = Date.now() / 1000;
+    const t0 = Math.floor((nowS + off) / H) * H - off;
+    const t1 = t0 + DAY;
+    const x = t => m.l + (t - t0) / DAY * pw;
+
+    const ht = d.hourly.time;
+    const i0 = ht.indexOf(t0);
+    if (i0 < 0 || i0 + 24 >= ht.length) { $('status').textContent = 'Keine passenden Stundenwerte.'; $('status').style.display = 'flex'; return; }
+    const idx = Array.from({ length: 25 }, (_, k) => i0 + k);
+    const temps = idx.map(i => d.hourly.temperature_2m[i]);
+
+    // Temperatur-Skala mit Puffer
+    const feels = state.opts.feels && d.hourly.apparent_temperature ? idx.map(i => d.hourly.apparent_temperature[i]) : null;
+    const scaleVals = feels ? temps.concat(feels.filter(v => v != null)) : temps;
+    let tMin = Math.min(...scaleVals), tMax = Math.max(...scaleVals);
+    const pad = Math.max(1.5, (tMax - tMin) * 0.15);
+    tMin -= pad; tMax += pad;
+    const step = niceStep(tMax - tMin, 4);
+    tMin = Math.floor(tMin / step) * step;
+    tMax = Math.ceil(tMax / step) * step;
+    const y = v => m.t + (tMax - v) / (tMax - tMin) * ph;
+
+    // Niederschlags-Skala (rechts)
+    const mm = idx.slice(1).map(i => d.hourly.precipitation[i] ?? 0);
+    const prob = idx.slice(1).map(i => d.hourly.precipitation_probability[i] ?? 0);
+    // Feste Stufenskala: 0–5 mm/h untere Hälfte (linear), 5–50 mm/h obere Hälfte (gestaucht)
+    const R_STEP = 5, R_MAX = 50;
+    const rainFrac = v => v <= R_STEP ? v / R_STEP * 0.5 : 0.5 + (Math.min(v, R_MAX) - R_STEP) / (R_MAX - R_STEP) * 0.5;
+    const yp = v => m.t + ph - rainFrac(v) * ph;
+
+    // Zeichenfläche beschneiden
+    const defs = el('defs', {}, svg);
+    const clip = el('clipPath', { id: 'plot' }, defs);
+    el('rect', { x: m.l, y: m.t, width: pw, height: ph, rx: 6 }, clip);
+    const plot = el('g', { 'clip-path': 'url(#plot)' }, svg);
+
+    // 1) Hintergrund: Tag/Nacht mit Dämmerungsverlauf.
+    //    Zwischen Sonnenauf- und -untergang (Open-Meteo) voll Tag; davor/danach Übergang
+    //    bis zur bürgerlichen Dämmerung (Sonne 6° unter dem Horizont) = voll Nacht.
+    const sr = d.daily.sunrise, ss = d.daily.sunset;
+    const { lat, lon } = state.loc;
+    const dayC = hex2rgb(css('--day')), nightC = hex2rgb(css('--night'));
+    // Mondlicht hellt die Nacht leicht auf: max. 14 % bei Vollmond hoch am Himmel
+    const moonFrac = Moon.illumination(t0 + DAY / 2).fraction;
+    const moonLight = t => 0.14 * moonFrac * Math.min(1, Math.max(0, Moon.altitude(t, lat, lon) / 30));
+    const lightness = t => {
+      if (sr.some((s, k) => t >= s && t <= ss[k])) return 1;
+      const el0 = sunElevation(t, lat, lon);
+      return Math.max(moonLight(t), Math.min(1, Math.max(0, (el0 + 6) / (6 - 0.833))));
+    };
+    const sky = el('linearGradient', { id: 'sky', gradientUnits: 'userSpaceOnUse', x1: m.l, x2: m.l + pw, y1: 0, y2: 0 }, defs);
+    const stops = [];
+    for (let t = t0; t <= t1; t += 300) stops.push(t);
+    // exakte Kanten bei Sonnenauf-/-untergang ergänzen
+    sr.concat(ss).forEach(t => { if (t > t0 && t < t1) stops.push(t - 1, t); });
+    stops.sort((p, q) => p - q).forEach(t => {
+      el('stop', { offset: (t - t0) / DAY, 'stop-color': mix(nightC, dayC, lightness(t)) }, sky);
+    });
+    el('rect', { x: m.l, y: m.t, width: pw, height: ph, fill: 'url(#sky)' }, plot);
+
+    // Stündliches Raster (dezent), Mitternachts- und Mittagslinie
+    const hgrid = el('g', { stroke: 'rgba(128,128,128,.14)', 'stroke-width': 1 }, plot);
+    for (let k = 1; k < 24; k++) el('line', { x1: x(t0 + k * H), x2: x(t0 + k * H), y1: m.t, y2: m.t + ph }, hgrid);
+    for (let k = 1; k < 24; k++) {
+      const t = t0 + k * H;
+      const hr = new Date((t + off) * 1000).getUTCHours();
+      if (hr === 0 || hr === 12)
+        el('line', { x1: x(t), x2: x(t), y1: m.t, y2: m.t + ph, stroke: hr === 0 ? 'rgba(140,140,140,.75)' : 'rgba(140,140,140,.5)', 'stroke-width': 1 }, plot);
+    }
+
+    // Hilfslinien Temperatur
+    const grid = el('g', { stroke: 'rgba(128,128,128,.28)', 'stroke-width': 1 }, plot);
+    for (let v = tMin + step; v < tMax - step / 2; v += step) {
+      if (Math.abs(v) < 1e-9) continue;
+      el('line', { x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v) }, grid);
+    }
+
+    // Bewölkung: eine Spindel oben im Chart. Dicke ∝ Gesamtbedeckung, darin anteilig
+    // nach Stockwerk gestapelt wie am Himmel: oben hohe Wolken (hell, dünne Cirren),
+    // unten tiefe Wolken (dunkel, dichte Wolkenbasis).
+    const series = key => {
+      const a = d.hourly[key];
+      if (!a) return null;
+      const v = idx.map(i => a[i]);
+      return v.every(c => c == null) ? null : v.map(c => c ?? 0);
+    };
+    const cHigh = series('cloud_cover_high'), cMid = series('cloud_cover_mid'), cLow = series('cloud_cover_low');
+    const hasLayers = !!(cHigh || cMid || cLow);
+    const layerVals = [[cHigh, '--cloud-high'], [cMid, '--cloud-mid'], [cLow, '--cloud-low']]
+      .map(([v, c]) => [v || idx.map(() => 0), c]);
+    const cTotal = series('cloud_cover')
+      || idx.map((_, k) => Math.max(...layerVals.map(([v]) => v[k])));
+    const clouds = el('g', {}, plot);
+    if (state.opts.clouds && Math.max(...cTotal) > 0) {
+      const maxThick = CLOUD_MAX_PX;                // 100 % Bedeckung, feste Höhe unabhängig von der Skala
+      const cy = m.t + ph * 0.02 + maxThick / 2;
+      const xs = idx.map((_, k) => x(t0 + k * H));
+      // Grenzlinien von oben nach unten: Oberkante, hoch|mittel, mittel|tief, Unterkante
+      const edges = [[], [], [], []];
+      cTotal.forEach((tot, k) => {
+        const T = tot / 100 * maxThick;
+        const parts = hasLayers ? layerVals.map(([v]) => v[k]) : [0, 1, 0];
+        const sum = parts.reduce((p, q) => p + q, 0) || 1;
+        let yy = cy - T / 2;
+        edges[0].push([xs[k], yy]);
+        parts.forEach((p, j) => { yy += T * p / sum; edges[j + 1].push([xs[k], yy]); });
+      });
+      layerVals.forEach(([, color], j) => {
+        const top = edges[j], bot = edges[j + 1];
+        if (top.every((p, k) => bot[k][1] - p[1] < 0.05)) return; // Stockwerk leer
+        el('path', { d: monotonePath(top) + monotonePath([...bot].reverse()).replace(/^M/, 'L') + 'Z', fill: css(color) }, clouds);
+      });
+    }
+
+    // 2) Niederschlagsbalken (Wert gilt für die vorangegangene Stunde)
+    //    Anteil bis 5 mm halbtransparent, darüber deckendes Blau; über 50 mm ▲ an der Spitze
+    const bars = el('g', {}, plot);
+    const base = m.t + ph;
+    mm.forEach((v, k) => {
+      if (v < 0.1) return;
+      const tb = t0 + (k + 1) * H;
+      const xa = x(tb - H) + 1, bw = Math.max(1, x(tb) - 1 - xa);
+      const yLow = Math.min(yp(Math.min(v, R_STEP)), base - 2); // mind. 2 px sichtbar
+      el('rect', { x: xa, y: yLow, width: bw, height: base - yLow, fill: css('--rain') }, bars);
+      if (v > R_STEP) {
+        el('rect', { x: xa, y: yp(v), width: bw, height: yp(R_STEP) - yp(v), fill: css('--rain-strong') }, bars);
+      }
+      if (v > R_MAX) {
+        const t = el('text', { x: xa + bw / 2, y: m.t + 10, 'text-anchor': 'middle', 'font-size': 9, fill: '#fff' }, bars);
+        t.textContent = '▲';
+      }
+    });
+    plot.appendChild(clouds); // Wolken vor den Regenbalken, hinter den Kurven
+
+    // Regenwahrscheinlichkeit: schmale Leiste unter der Grafik, Deckkraft = Wahrscheinlichkeit
+    const probG = el('g', {}, svg);
+    prob.forEach((p, k) => {
+      const tb = t0 + (k + 1) * H;
+      el('rect', { x: x(tb - H) + 0.5, y: m.t + ph + 2, width: Math.max(1, x(tb) - x(tb - H) - 1), height: PROB_H - 2, rx: 1,
+        fill: `rgba(${css('--rain-prob')},${(p / 100).toFixed(2)})` }, probG);
+    });
+    el('rect', { x: m.l, y: m.t + ph + 2, width: pw, height: PROB_H - 2, rx: 1, fill: 'none', stroke: 'rgba(128,128,128,.35)', 'stroke-width': 0.5 }, probG);
+
+    // 0-°C-Linie
+    if (tMin < 0 && tMax > 0) {
+      el('line', { x1: m.l, x2: m.l + pw, y1: y(0), y2: y(0), stroke: 'rgba(128,128,128,.9)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }, plot);
+    }
+
+    // UV-Index: dünne gelbe Linie, eigene Skala 0–11 (bei höheren Werten gestreckt)
+    const uv = idx.map(i => d.hourly.uv_index[i] ?? 0);
+    const uvMax = Math.max(...uv);
+    if (state.opts.uv && uvMax > 0) {
+      const uTop = Math.max(11, uvMax * 1.1);
+      const yu = v => m.t + ph - v / uTop * ph;
+      const upts = uv.map((v, k) => [x(t0 + k * H), yu(v)]);
+      el('path', { d: monotonePath(upts), fill: 'none', stroke: 'var(--uv)', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, plot);
+      const ku = uv.indexOf(uvMax);
+      const ux = Math.min(m.l + pw - 8, Math.max(m.l + 8, x(t0 + ku * H)));
+      const ut = el('text', { x: ux, y: yu(uvMax) - 5, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700,
+        fill: 'var(--uv)', class: 'lbl' }, plot);
+      ut.textContent = String(Math.round(uvMax * 10) / 10).replace('.', ',');
+    }
+
+    // Tide (nur am Meer): dünne türkise Linie im unteren Drittel, eigene Skala ohne Achse;
+    // Hoch-/Niedrigwasser (HW/NW) per Parabel zwischen den Stundenwerten auf die Minute geschätzt
+    if (state.tide && state.opts.tide) {
+      const tideAt = new Map(state.tide.t.map((t, j) => [t, state.tide.h[j]]));
+      const ks = [];
+      for (let k = -2; k <= 26; k++) { const v = tideAt.get(t0 + k * H); if (v != null) ks.push([k, v]); }
+      const inWin = ks.filter(([k]) => k >= 0 && k <= 24);
+      if (inWin.length > 1) {
+        const vs = ks.map(([, v]) => v);
+        const lo = Math.min(...vs), hi = Math.max(...vs), span = Math.max(0.2, hi - lo);
+        const bandTop = m.t + ph * 0.66, bandH = ph * 0.26;
+        const yt = v => bandTop + (hi - v) / span * bandH;
+        const tpts = ks.map(([k, v]) => [x(t0 + k * H), yt(v)]);
+        el('path', { d: monotonePath(tpts), fill: 'none', stroke: 'var(--tide)', 'stroke-width': 1.5, 'stroke-linejoin': 'round', class: 'tide-line' }, plot);
+        const tl = el('g', { 'font-size': 9.5, 'font-weight': 600, 'text-anchor': 'middle', fill: 'var(--tide)' }, plot);
+        for (let j = 1; j < ks.length - 1; j++) {
+          const [k, v] = ks[j], a = ks[j - 1][1], b = ks[j + 1][1];
+          if (ks[j - 1][0] !== k - 1 || ks[j + 1][0] !== k + 1) continue;
+          const isHW = v > a && v >= b, isNW = v < a && v <= b;
+          if (!isHW && !isNW) continue;
+          const den = a - 2 * v + b;
+          const o = den ? Math.max(-0.5, Math.min(0.5, (a - b) / (2 * den))) : 0;
+          const te = t0 + (k + o) * H, ve = v - (a - b) * o / 4;
+          if (te < t0 || te > t1) continue;
+          const lx = Math.min(m.l + pw - 24, Math.max(m.l + 24, x(te)));
+          const ly = isHW ? yt(ve) - 5 : Math.min(yt(ve) + 12, m.t + ph - 2);
+          el('text', { x: lx, y: ly, class: 'tide-lbl', 'data-hw': isHW ? 1 : 0 }, tl).textContent = (isHW ? 'HW ' : 'NW ') + hhmm(te, off);
+        }
+      }
+    }
+
+    const uvLbl = plot.querySelector('text.lbl[fill="var(--uv)"]');
+    if (uvLbl) plot.appendChild(uvLbl); // UV-Zahl vor die Tidenlinie
+
+    // 3) Temperaturkurve: Farbwechsel exakt bei 0 °C per harter Gradientenkante
+    const grad = el('linearGradient', { id: 'tgrad', gradientUnits: 'userSpaceOnUse', x1: 0, x2: 0, y1: m.t, y2: m.t + ph }, defs);
+    const z = Math.min(1, Math.max(0, (y(0) - m.t) / ph));
+    el('stop', { offset: 0, 'stop-color': css('--warm') }, grad);
+    el('stop', { offset: z, 'stop-color': css('--warm') }, grad);
+    el('stop', { offset: z, 'stop-color': css('--cold') }, grad);
+    el('stop', { offset: 1, 'stop-color': css('--cold') }, grad);
+    // Gefühlte Temperatur: dünn gestrichelt, gleiche Farblogik, hinter der echten Kurve
+    let fPath = null;
+    if (feels && feels.every(v => v != null)) {
+      const fpts = feels.map((v, k) => [x(t0 + k * H), y(v)]);
+      fPath = el('path', { d: monotonePath(fpts), fill: 'none', stroke: 'url(#tgrad)', 'stroke-width': 1.1,
+        'stroke-dasharray': '4 3', 'stroke-opacity': 0.8, 'stroke-linecap': 'round' }, plot);
+    }
+    const pts = idx.map((i, k) => [x(t0 + k * H), y(temps[k])]);
+    const tPath = el('path', { d: monotonePath(pts), fill: 'none', stroke: 'url(#tgrad)', 'stroke-width': 2.75, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, plot);
+
+    // Jetzt-Markierung
+    el('line', { x1: x(nowS), x2: x(nowS), y1: m.t, y2: m.t + ph, stroke: 'rgba(255,159,10,.9)', 'stroke-width': 1.5 }, plot);
+
+    const isDay = t => lightness(t) > 0.5;
+
+    const every = pw / 12 >= 30 ? 2 : 4;  // Raster der Wind-Leiste (schmale Anzeige: alle 4 h)
+    const tStep = pw / 12 >= 18 ? 2 : 4;  // Raster der Zeitachse
+
+    // Wettersymbole auf der Temperaturkurve alle 2 h (bei schmaler Anzeige alle 4 h).
+    // Das Symbol sitzt über dem höchsten Kurvenpunkt innerhalb seiner Breite,
+    // damit es die Kurve auch bei steilem Anstieg nicht berührt.
+    const symEvery = pw / 12 >= 26 ? 2 : 4;
+    const symK = [];
+    const wc = d.hourly.weather_code;
+    if (wc) {
+      const FS = 17, halfW = FS * 0.6 + 2, gap = 3;
+      const curve = [];
+      [tPath, fPath].filter(Boolean).forEach(path => {
+        const len = path.getTotalLength();
+        for (let l = 0; l <= len; l += 1) { const p = path.getPointAtLength(l); curve.push([p.x, p.y]); }
+      });
+      const syms = el('g', { 'font-size': FS, 'text-anchor': 'middle' }, plot);
+      for (let k = 0; k <= 24; k++) {
+        const t = t0 + k * H;
+        if (new Date((t + off) * 1000).getUTCHours() % symEvery !== 0 || x(t) - m.l < 12 || m.l + pw - x(t) < 12) continue;
+        const w = wmo(wc[idx[k]]);
+        if (!w) continue;
+        symK.push(k);
+        let top = y(temps[k]);
+        for (const [px, py] of curve) if (Math.abs(px - x(t)) <= halfW && py < top) top = py;
+        // Emoji ragt ca. 0,2 × Schriftgröße unter die Grundlinie; halbe Strichbreite der Kurve berücksichtigen
+        const sy = el('text', { x: x(t), y: top - 1.4 - gap - FS * 0.2, class: 'lbl' }, syms);
+        const clear = [0, 1].includes(wc[idx[k]]);
+        sy.textContent = isDay(t) ? w[1]
+          : clear ? (Moon.altitude(t, lat, lon) > 0 ? Moon.emoji(Moon.illumination(t).phase) : '✨')
+          : w[2];
+      }
+    }
+
+    // Min/Max-Beschriftung an der Kurve (Maximum über ein Symbol ausweichen)
+    const ann = el('g', { 'font-size': 11, 'font-weight': 600, 'text-anchor': 'middle' }, plot);
+    const kMax = temps.indexOf(Math.max(...temps)), kMin = temps.indexOf(Math.min(...temps));
+    const maxDy = symK.some(k => Math.abs(k - kMax) <= 1) ? -24 : -7;
+    [[kMax, maxDy], [kMin, 15]].forEach(([k, dy]) => {
+      const t = t0 + k * H;
+      const tx = Math.min(m.l + pw - 14, Math.max(m.l + 14, x(t)));
+      const txt = el('text', { x: tx, y: Math.max(m.t + 11, Math.min(m.t + ph - 3, y(temps[k]) + dy)), fill: isDay(t) ? '#1c1c1e' : '#f2f2f7', class: 'lbl' }, ann);
+      txt.textContent = Math.round(temps[k]) + '°';
+    });
+
+    // Tide-Beschriftungen frei stellen: Hindernisse sind Min/Max-/UV-Zahl, Wettersymbole und alle Kurven.
+    // Kandidaten: seitlich, weiter weg von der Linie oder notfalls auf die andere Seite – kleinste freie Verschiebung
+    const tideLbls = [...plot.querySelectorAll('text.tide-lbl')];
+    if (tideLbls.length) {
+      const boxes = [...plot.querySelectorAll('text.lbl')].map(e => e.getBBox());
+      const curvePts = [];
+      [tPath, fPath, plot.querySelector('path.tide-line')].filter(Boolean).forEach(path => {
+        const len = path.getTotalLength();
+        for (let l = 0; l <= len; l += 2) { const q = path.getPointAtLength(l); curvePts.push([q.x, q.y]); }
+      });
+      const hits = (b, dx, dy) => boxes.some(o => b.x + dx < o.x + o.width + 2 && o.x < b.x + dx + b.width + 2
+        && b.y + dy < o.y + o.height && o.y < b.y + dy + b.height)
+        || curvePts.some(([px, py]) => px >= b.x + dx - 1 && px <= b.x + dx + b.width + 1 && py >= b.y + dy - 2 && py <= b.y + dy + b.height + 2);
+      tideLbls.forEach(e => {
+        const b = e.getBBox(), away = e.dataset.hw === '1' ? -1 : 1;
+        if (!hits(b, 0, 0)) { boxes.push(b); return; }
+        const cands = [];
+        for (const [dy, pen] of [[0, 0], [12 * away, 0], [24 * away, 6], [-17 * away, 10], [-29 * away, 16]])
+          for (const dx of [0, b.width / 2 + 4, -(b.width / 2 + 4), b.width + 4, -(b.width + 4)])
+            cands.push([dx, dy, Math.hypot(dx * 0.8, dy) + pen]);
+        cands.sort((p, q) => p[2] - q[2]);
+        const ok = cands.find(([dx, dy]) => b.x + dx >= m.l && b.x + dx + b.width <= m.l + pw
+          && b.y + dy >= m.t && b.y + dy + b.height <= m.t + ph && !hits(b, dx, dy));
+        if (ok) {
+          e.setAttribute('x', +e.getAttribute('x') + ok[0]); e.setAttribute('y', +e.getAttribute('y') + ok[1]);
+          boxes.push({ x: b.x + ok[0], y: b.y + ok[1], width: b.width, height: b.height });
+        }
+      });
+    }
+
+    // Achsen
+    const ax = el('g', { class: 'axis' }, svg);
+    const tops = [];
+    sr.forEach((s0, k) => [[s0, '↑'], [ss[k], '↓']].forEach(([t, arrow]) => {
+      if (t > t0 && t < t1) tops.push({ t, text: arrow + ' ' + hhmm(t, off), w: 38 });
+    }));
+    // von links nach rechts ohne Überlappung anordnen, am Rand einklemmen
+    tops.sort((a, b) => a.t - b.t);
+    let right = -Infinity;
+    tops.forEach(o => { o.cx = Math.max(x(o.t), right + o.w / 2 + 4); right = o.cx + o.w / 2; });
+    let left = m.l + pw + 18;
+    [...tops].reverse().forEach(o => { o.cx = Math.min(o.cx, left - o.w / 2 - 4); left = o.cx - o.w / 2; });
+    tops.forEach(o => {
+      const lbl = el('text', { x: Math.max(m.l + o.w / 2 - 14, o.cx), y: m.t - 6, 'text-anchor': 'middle', class: 'sun' }, ax);
+      lbl.textContent = o.text;
+    });
+    for (let v = tMin; v <= tMax + 1e-9; v += step) {
+      const t = el('text', { x: m.l - 6, y: y(v) + 4, 'text-anchor': 'end' }, ax);
+      t.textContent = (Math.round(v * 10) / 10).toLocaleString('de-DE') + '°';
+    }
+    [0, 2, 5, 20, 50].forEach(v => {
+      const t = el('text', { x: m.l + pw + 6, y: Math.min(yp(v) + 4, m.t + ph), 'text-anchor': 'start' }, ax);
+      t.textContent = v;
+    });
+    const unit = el('text', { x: m.l + pw + 6, y: m.t + ph + PROB_H + 16, 'text-anchor': 'start' }, ax);
+    unit.textContent = 'mm';
+
+    // Zeitachse: „Jetzt“, dann alle 2 Stunden; Mitternacht mit Wochentag
+    const lj = el('text', { x: m.l, y: m.t + ph + PROB_H + 16, 'text-anchor': 'start', class: 'strong' }, ax);
+    lj.textContent = 'Jetzt';
+    for (let k = 1; k <= 24; k++) {
+      const t = t0 + k * H;
+      const hr = new Date((t + off) * 1000).getUTCHours();
+      if (hr % tStep !== 0 || x(t) - m.l < 40 || k > 23) continue; // Platz für „Jetzt“
+      const lbl = el('text', { x: x(t), y: m.t + ph + PROB_H + 16, 'text-anchor': 'middle' }, ax);
+      if (hr === 0) {
+        lbl.setAttribute('class', 'strong');
+        lbl.textContent = new Date((t + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' });
+      } else lbl.textContent = String(hr).padStart(2, '0');
+    }
+
+    // Wind-Leiste (unter der Zeitachse): Pfeil zeigt, wohin der Wind weht; Farbe nach Stärke; Zahl in km/h,
+    // klein rechts neben dem Pfeil; bei deutlich stärkeren Böen beide Zahlen übereinander. Alle 2 h (bei schmaler Anzeige alle 4 h).
+    const ws = d.hourly.wind_speed_10m, wd = d.hourly.wind_direction_10m, wg = d.hourly.wind_gusts_10m;
+    if (ws && wd) {
+      const wind = el('g', {}, svg);
+      const ay = m.t + ph + PROB_H + 31; // dicht unter der Zeitachse
+      for (let k = 0; k <= 24; k++) {
+        const t = t0 + k * H, i = idx[k];
+        const hr = new Date((t + off) * 1000).getUTCHours();
+        if (hr % every !== 0 || x(t) - m.l < 12 || m.l + pw - x(t) < 12) continue;
+        const v = ws[i], dir = wd[i], g = wg ? wg[i] : null;
+        if (v == null) continue;
+        const col = windColor(v);
+        const ax0 = x(t) - 6; // Pfeil links, Zahlen rechts daneben – Gruppe um die Stunde zentriert
+        if (v < 2 || dir == null) {
+          el('circle', { cx: ax0, cy: ay, r: 3, fill: 'none', stroke: col, 'stroke-width': 1.5 }, wind);
+        } else {
+          el('path', { d: 'M0,-8 L5,-1 L1.6,-1 L1.6,7 L-1.6,7 L-1.6,-1 L-5,-1 Z', fill: col,
+            transform: `translate(${ax0},${ay}) rotate(${(dir + 180) % 360})` }, wind);
+        }
+        const gust = g != null && g - v >= 10 && g >= 25;
+        const lbl = el('text', { x: ax0 + 8, y: gust ? ay - 1.5 : ay + 3.5, class: 'wind' }, wind);
+        lbl.textContent = Math.round(v);
+        if (gust) {
+          const gl = el('text', { x: ax0 + 8, y: ay + 8.5, class: 'wind', style: `fill:${windColor(g)}`, 'font-weight': 600 }, wind);
+          gl.textContent = '↯' + Math.round(g);
+        }
+      }
+    }
+
+    // Hover-Ebene
+    const cursor = el('line', { y1: m.t, y2: m.t + ph, stroke: 'rgba(128,128,128,.9)', 'stroke-width': 1, visibility: 'hidden' }, svg);
+    const dot = el('circle', { r: 4, fill: '#fff', 'stroke-width': 2, visibility: 'hidden' }, svg);
+    view = { m, pw, ph, t0, off, idx, temps, x, y, cursor, dot, W };
+  }
+
+  function showTip(ev) {
+    if (!view) return;
+    const d = state.data;
+    const svg = $('svg');
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (view.W / rect.width);
+    const k = Math.round((px - view.m.l) / view.pw * 24);
+    if (k < 0 || k > 24) return hideTip();
+    const t = view.t0 + k * H, i = view.idx[k];
+    const cx = view.x(t), cy = view.y(view.temps[k]);
+    view.cursor.setAttribute('x1', cx); view.cursor.setAttribute('x2', cx);
+    view.cursor.setAttribute('visibility', 'visible');
+    view.dot.setAttribute('cx', cx); view.dot.setAttribute('cy', cy);
+    view.dot.setAttribute('stroke', view.temps[k] < 0 ? css('--cold') : css('--warm'));
+    view.dot.setAttribute('visibility', 'visible');
+    const hh = String(new Date((t + view.off) * 1000).getUTCHours()).padStart(2, '0');
+    const p = d.hourly.precipitation_probability[i], mm = d.hourly.precipitation[i];
+    const tip = $('tip');
+    const w = d.hourly.weather_code ? wmo(d.hourly.weather_code[i]) : null;
+    const fl = state.opts.feels && d.hourly.apparent_temperature ? d.hourly.apparent_temperature[i] : null;
+    tip.innerHTML = `<b>${hh}:00</b> · ${fmt1(view.temps[k])} °C` + (fl != null ? ` (gefühlt ${fmt1(fl)} °C)` : '') + (w ? ` · ${w[3]}` : '')
+      + (k > 0 ? ` · 💧 ${p ?? '–'} % · ${fmt1(mm ?? 0)} mm` : '')
+      + (state.opts.uv ? ` · <span style="color:var(--uv)">UV ${fmt1(d.hourly.uv_index[i] ?? 0)}</span>` : '')
+      + (() => {
+        if (!state.tide || !state.opts.tide) return '';
+        const j = state.tide.t.indexOf(t);
+        const v = j >= 0 ? state.tide.h[j] : null;
+        return v != null ? ` · <span style="color:var(--tide)">🌊 ${v >= 0 ? '+' : ''}${fmt1(v)} m</span>` : '';
+      })()
+      + (state.opts.clouds && d.hourly.cloud_cover_low
+        ? `<br>☁︎ tief ${d.hourly.cloud_cover_low[i] ?? '–'} % · mittel ${d.hourly.cloud_cover_mid[i] ?? '–'} % · hoch ${d.hourly.cloud_cover_high[i] ?? '–'} %`
+        : '')
+      + (d.hourly.wind_speed_10m
+        ? `<br>💨 ${Math.round(d.hourly.wind_speed_10m[i])} km/h aus ${compass(d.hourly.wind_direction_10m[i])}`
+          + (d.hourly.wind_gusts_10m ? ` · Böen ${Math.round(d.hourly.wind_gusts_10m[i])} km/h` : '')
+        : '');
+    tip.style.display = 'block';
+    const left = cx * rect.width / view.W;
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(rect.width - tw, Math.max(0, left - tw / 2)) + 'px';
+  }
+  function hideTip() {
+    $('tip').style.display = 'none';
+    if (view) { view.cursor.setAttribute('visibility', 'hidden'); view.dot.setAttribute('visibility', 'hidden'); }
+  }
+
+  function render() {
+    if (!state.data) return;
+    renderHeader();
+    renderChart();
+  }
+
+  // ---------- Ort wählen ----------
+  function setLoc(loc) {
+    state.loc = loc;
+    store.set('loc', loc);
+    state.data = null;
+    state.tide = null;
+    $('name').textContent = loc.name;
+    $('status').textContent = 'Lade Wetterdaten …';
+    load();
+  }
+
+  let searchTimer, results = [], active = -1;
+  $('q').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) { $('results').replaceChildren(); return; }
+    searchTimer = setTimeout(() => search(q), 250);
+  });
+  $('q').addEventListener('keydown', e => {
+    const lis = $('results').children;
+    if (!lis.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + lis.length) % lis.length;
+      [...lis].forEach((li, i) => li.classList.toggle('active', i === active));
+    } else if (e.key === 'Enter') {
+      pick(results[Math.max(0, active)]);
+    } else if (e.key === 'Escape') {
+      $('results').replaceChildren();
+    }
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.search')) $('results').replaceChildren(); });
+
+  async function search(q) {
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=de&format=json`);
+      const j = await r.json();
+      results = j.results || [];
+      active = -1;
+      $('results').replaceChildren(...(results.length ? results.map((g, i) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.innerHTML = `${g.name} <small>${[g.admin2, g.admin1, g.country].filter(Boolean).join(', ')}</small>`;
+        li.addEventListener('click', () => pick(g));
+        return li;
+      }) : [Object.assign(document.createElement('li'), { textContent: 'Kein Ort gefunden' })]));
+    } catch { /* Suche still fehlschlagen lassen */ }
+  }
+  function pick(g) {
+    if (!g) return;
+    $('results').replaceChildren();
+    $('q').value = '';
+    setLoc({ name: g.name, region: [g.admin2, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude });
+  }
+
+  $('gps').addEventListener('click', () => {
+    if (!navigator.geolocation) return alert('Standortbestimmung wird nicht unterstützt.');
+    $('gps').disabled = true;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      $('gps').disabled = false;
+      const lat = +pos.coords.latitude.toFixed(4), lon = +pos.coords.longitude.toFixed(4);
+      let name = 'Mein Standort', region = '';
+      try {
+        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=de`);
+        const j = await r.json();
+        name = j.city || j.locality || name;
+        region = j.principalSubdivision || '';
+      } catch {}
+      setLoc({ name, region, lat, lon });
+    }, err => {
+      $('gps').disabled = false;
+      alert('Standort nicht verfügbar: ' + err.message);
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+  });
+
+  $('reload').addEventListener('click', load);
+
+  // ---------- Einstellungen ----------
+  document.querySelectorAll('#settings input[data-opt]').forEach(cb => {
+    cb.checked = !!state.opts[cb.dataset.opt];
+    cb.addEventListener('change', () => {
+      state.opts[cb.dataset.opt] = cb.checked;
+      store.set('opts', state.opts);
+      // Tide eingeschaltet, aber noch nicht geladen → nachladen; sonst nur neu zeichnen
+      if (cb.dataset.opt === 'tide' && cb.checked && !state.tide && !noTide.has(tideKey(state.loc))) load();
+      else render();
+    });
+  });
+
+  $('svg').addEventListener('pointermove', showTip);
+  $('svg').addEventListener('pointerdown', showTip);
+  $('svg').addEventListener('pointerleave', hideTip);
+  // Mobil: Tippen außerhalb der Grafik schließt den Tooltip
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('#svg')) hideTip(); });
+
+  new ResizeObserver(() => render()).observe($('chart'));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+
+  // Wie ein Widget: jede Minute „Jetzt“ nachziehen, alle 15 Minuten neu laden –
+  // aber nur, solange die Seite sichtbar ist. Beim Zurückkehren sofort prüfen.
+  const tick = () => {
+    if (document.hidden) return;
+    if (Date.now() - state.lastAttempt >= 15 * 60 * 1000) load();
+    else render();
+  };
+  setInterval(tick, 60 * 1000);
+  document.addEventListener('visibilitychange', tick);
+
+  $('name').textContent = state.loc.name;
+  load();
+})();
+</script>
+</body>
+</html>
