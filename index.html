@@ -128,6 +128,9 @@
     border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; cursor: pointer;
   }
   button:hover { border-color: var(--accent); }
+  button.icon { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  button.icon svg { width: 20px; height: 20px; }
+  button.icon:disabled { opacity: .5; }
   .results {
     position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
     list-style: none; margin: 0; padding: 4px;
@@ -166,7 +169,12 @@
         <input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" aria-label="Ort suchen">
         <ul class="results" id="results" role="listbox"></ul>
       </div>
-      <button id="gps" title="Aktuellen Standort verwenden">📍 Mein Standort</button>
+      <button id="gps" class="icon" title="Mein Standort" aria-label="Mein Standort">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 3.5 3.8 10.6c-.8.3-.7 1.5.1 1.7l6.6 1.2 1.2 6.6c.2.8 1.4.9 1.7.1z" fill="currentColor"/></svg>
+      </button>
+      <button id="reload" class="icon" title="Aktualisieren" aria-label="Aktualisieren">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
     <details class="settings" id="settings">
       <summary>⚙︎ Einstellungen</summary>
@@ -177,9 +185,6 @@
         <label><input type="checkbox" data-opt="clouds"> Wolken</label>
       </div>
     </details>
-    <div class="row">
-      <button id="reload" title="Neu laden">↻ Aktualisieren</button>
-    </div>
   </section>
 
   <p class="note">
@@ -665,7 +670,7 @@
     const isDay = t => lightness(t) > 0.5;
 
     const every = pw / 12 >= 30 ? 2 : 4;  // Raster der Wind-Leiste (schmale Anzeige: alle 4 h)
-    const tStep = pw / 12 >= 18 ? 2 : 4;  // Raster der Zeitachse
+    const tStep = pw / 24 >= 16 ? 1 : pw / 12 >= 18 ? 2 : 4;  // Raster der Zeitachse: stündlich, wenn Platz
 
     // Wettersymbole auf der Temperaturkurve alle 2 h (bei schmaler Anzeige alle 4 h).
     // Das Symbol sitzt über dem höchsten Kurvenpunkt innerhalb seiner Breite,
@@ -766,14 +771,12 @@
     const unit = el('text', { x: m.l + pw + 6, y: m.t + ph + PROB_H + 16, 'text-anchor': 'start' }, ax);
     unit.textContent = 'mm';
 
-    // Zeitachse: „Jetzt“, dann alle 2 Stunden; Mitternacht mit Wochentag
-    const lj = el('text', { x: m.l, y: m.t + ph + PROB_H + 16, 'text-anchor': 'start', class: 'strong' }, ax);
-    lj.textContent = 'Jetzt';
-    for (let k = 1; k <= 24; k++) {
+    // Zeitachse: stündlich (bei wenig Platz alle 2 bzw. 4 h); Mitternacht mit Wochentag
+    for (let k = 0; k < 24; k++) {
       const t = t0 + k * H;
       const hr = new Date((t + off) * 1000).getUTCHours();
-      if (hr % tStep !== 0 || x(t) - m.l < 40 || k > 23) continue; // Platz für „Jetzt“
-      const lbl = el('text', { x: x(t), y: m.t + ph + PROB_H + 16, 'text-anchor': 'middle' }, ax);
+      if (hr % tStep !== 0) continue;
+      const lbl = el('text', { x: x(t), y: m.t + ph + PROB_H + 16, 'text-anchor': 'middle', 'font-size': tStep === 1 ? 10 : 11 }, ax);
       if (hr === 0) {
         lbl.setAttribute('class', 'strong');
         lbl.textContent = new Date((t + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' });
