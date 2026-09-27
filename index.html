@@ -678,7 +678,10 @@
     const old = radar.gen;
     radar.gen = gen;
     if (old) old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
-    gen.urls.forEach((u, i) => {
+    // Ladereihenfolge: gewähltes Bild zuerst, dann abwechselnd nach außen (davor/danach)
+    const order = gen.urls.map((_, i) => i).sort((p, q) => Math.abs(p - radar.idx) - Math.abs(q - radar.idx) || q - p);
+    order.forEach(i => {
+      const u = gen.urls[i];
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = async () => {
