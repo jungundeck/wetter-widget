@@ -852,8 +852,12 @@
       // noch laufende Downloads des alten Satzes abbrechen – sie würden sonst die Leitungen belegen
       (old.imgs || []).forEach((im, i) => { if (im && !old.srcs[i]) { im.onload = im.onerror = null; im.src = ''; } });
     }
-    // Ladereihenfolge: gewähltes Bild zuerst, dann abwechselnd nach außen (davor/danach)
-    const order = gen.urls.map((_, i) => i).sort((p, q) => Math.abs(p - radar.idx) - Math.abs(q - radar.idx) || q - p);
+    // Ladereihenfolge: erst ±30 min um das gewählte Bild (von innen nach außen), dann die Vorhersage
+    // der Reihe nach, zuletzt die Vergangenheit rückwärts
+    const c = radar.idx, near = Math.round(30 * 60e3 / (isModel() ? 3600e3 : RADAR_STEP));
+    const prio = i => Math.abs(i - c) <= near ? Math.abs(i - c) * 2 + (i < c ? 1 : 0)
+      : i > c ? 1000 + (i - c) : 2000 + (c - i);
+    const order = gen.urls.map((_, i) => i).sort((p, q) => prio(p) - prio(q));
     gen.imgs = []; // Referenzen halten, damit der Browser die Bilder im Speicher behält
     order.forEach(i => {
       const u = gen.urls[i];
