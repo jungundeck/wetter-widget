@@ -149,6 +149,9 @@
     width: 60px; height: 12px; border-radius: 3px; display: inline-block;
     background: linear-gradient(90deg, rgb(var(--sun)), var(--cell));
   }
+  .rmode { display: flex; gap: 0; margin: 0 0 8px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; width: max-content; }
+  .rmode button { border: 0; border-radius: 0; padding: 5px 12px; font-size: 13px; background: var(--input); color: var(--text); }
+  .rmode button[aria-pressed=true] { background: var(--accent); color: #fff; }
   .radarmap { position: relative; height: min(62vh, 380px); border-radius: 10px; overflow: hidden; background: var(--cell); }
   #radarMap { position: absolute; inset: 0; }
   #radarMap.leaflet-container { touch-action: pan-x pan-y !important; } /* ein Finger: Seite scrollen */
@@ -186,6 +189,16 @@
   .radarctl button.icon { width: 38px; height: 38px; }
   .radarctl .rslider { position: relative; flex: 1; min-width: 0; padding-bottom: 12px; }
   .radarctl input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
+  .radarctl .rticks { position: absolute; left: 0; right: 0; top: 18px; height: 14px; }
+  .radarctl .rticks[hidden], .legend span[hidden] { display: none; }
+  .radarctl .rticks span {
+    position: absolute; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .radarctl .rticks span.day { color: var(--text); font-weight: 600; }
+  .radarctl .rticks span::before {
+    content: ""; position: absolute; left: 50%; top: -7px; width: 1px; height: 5px; background: var(--muted);
+  }
   .radarctl .nowmark {
     position: absolute; top: 18px; transform: translateX(-50%); border: 0; background: none; padding: 0;
     font-size: 10px; color: var(--muted); cursor: pointer;
@@ -285,6 +298,7 @@
     .trend .legend { padding: 6px 8px 2px; }
     .radarmap { border-radius: 0; }
     .radarctl { padding: 8px 10px 0; }
+    .rmode { margin-left: 10px; }
     .head { padding: 0 8px 6px; }
     .head .line1 { font-size: 16px; }
     .tabs { padding: 0 10px 8px; margin: 0; }
@@ -363,7 +377,11 @@
 
 
   <details class="widget trend radar" id="radarBox" aria-label="Regenradar">
-    <summary><h2>Regenradar <small>(DWD · −2 h bis +2 h)</small></h2></summary>
+    <summary><h2>Regenradar <small id="radarSub">(DWD · −2 h bis +2 h)</small></h2></summary>
+    <div class="rmode" role="group" aria-label="Ansicht">
+      <button type="button" data-mode="radar" aria-pressed="true">Radar ±2 h</button>
+      <button type="button" data-mode="model" aria-pressed="false">Modell 48 h</button>
+    </div>
     <div class="radarmap">
       <div id="radarMap"></div>
       <div class="status" id="radarStatus">Lade Radar …</div>
@@ -381,6 +399,7 @@
       <div class="rslider">
         <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
         <button type="button" class="nowmark" id="radarNowMark" title="Zur aktuellen Zeit">jetzt</button>
+        <div class="rticks" id="radarTicks" hidden></div>
       </div>
     </div>
     <div class="legend rscale">
@@ -389,7 +408,8 @@
       <span><i style="background:#4db31b"></i>1</span><span><i style="background:#cce601"></i>3</span>
       <span><i style="background:#ffff01"></i>5</span><span><i style="background:#ff8901"></i>10</span>
       <span><i style="background:#fe0000"></i>30</span><span><i style="background:#cc0098"></i>75+</span>
-      <span><i style="background:rgba(128,128,128,.35)"></i>keine Daten</span>
+      <span id="radarNoData"><i style="background:rgba(128,128,128,.35)"></i>keine Daten</span>
+      <span id="radarModelNote" hidden>Modell: Stundensumme, ICON-EU (ca. 7 km)</span>
     </div>
   </details>
 
@@ -501,6 +521,8 @@
       <h3>Regenradar – Farben</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="4" width="12" height="20" fill="#33ffff"/><rect x="12" y="4" width="12" height="20" fill="#4db31b"/><rect x="24" y="4" width="12" height="20" fill="#ffff01"/><rect x="36" y="4" width="12" height="20" fill="#ff8901"/><rect x="48" y="4" width="12" height="20" fill="#fe0000"/><rect x="60" y="4" width="12" height="20" fill="#cc0098"/></svg></div>
         <p>Regenmenge pro Stunde: <span style="color:#1acc9a">türkis</span> = Niesel (unter 0,4 mm), <span style="color:#4db31b">grün</span> = leichter Regen (bis 2 mm), <b style="color:#b8a800">gelb</b> = mäßig (3–7 mm), <span style="color:#ff8901">orange</span> = kräftig (7–15 mm), <span style="color:#fe0000">rot</span> = Starkregen (15–45 mm), <span style="color:#cc0098">violett</span>/blau = extrem, oft mit Gewitter oder Hagel (ab 45 mm). Grau = keine Radardaten (außerhalb Deutschlands).</p></div>
+      <div class="ex-row"><div class="ex ex-text">Radar ±2 h | Modell 48 h</div>
+        <p><b>Radar</b>: gemessen (letzte 2 h) und daraus 2 h weitergerechnet, 1 km fein, alle 5 min. <b>Modell 48 h</b>: Vorhersage des DWD-Wettermodells ICON-EU für jede Stunde der nächsten zwei Tage – gröber (ca. 7 km), aber weiter voraus und auch außerhalb Deutschlands. Gleiche Farben wie beim Radar.</p></div>
 
       <h3>14-Tage-Trends</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="0" width="24" height="22" fill="rgba(90,130,190,.12)"/><circle cx="12" cy="6" r="2.5" fill="#ff3b30"/><circle cx="36" cy="4" r="2.5" fill="#ff3b30"/><circle cx="60" cy="9" r="2.5" fill="#ff3b30"/><circle cx="12" cy="17" r="2.5" fill="#007aff"/><circle cx="36" cy="15" r="2.5" fill="#007aff"/><circle cx="60" cy="19" r="2.5" fill="#007aff"/><rect x="0" y="23" width="23" height="5" fill="rgba(252,242,40,1)"/><rect x="24" y="23" width="23" height="5" fill="rgba(252,242,40,.3)"/><rect x="48" y="23" width="24" height="5" fill="#ececec"/></svg></div>
@@ -663,9 +685,19 @@
   const RADAR_LAYER = 'dwd:Radar_rv_product_1x1km_ger';
   const RADAR_CAPS = 'https://maps.dwd.de/geoserver/dwd/Radar_rv_product_1x1km_ger/ows?service=WMS&version=1.3.0&request=GetCapabilities';
   const RADAR_STEP = 5 * 60 * 1000; // volles DWD-Raster
+  // Ansicht „Modell 48 h“: stündlicher Niederschlag aus dem DWD-Modell ICON-EU (neuester Lauf, ganz Europa, ~7 km)
+  const MODEL_LAYER = 'dwd:Icon-eu_reg00625_fd_sl_TOTPREC01H';
+  // DWD-Modellfarben (mm/h-Klassen) → Farben der Radarskala, damit beide Ansichten dieselbe Legende haben
+  const MODEL_COLORS = [
+    ['c0c0c0', '4db31b'], ['fefec0', 'cce601'], ['fefe5b', 'ffc401'], ['cff200', 'ff8901'], ['a0d625', 'ff4501'],
+    ['36c969', 'ff4501'], ['00d7d7', 'ff4501'], ['00a6dd', 'fe0000'], ['0000fe', 'e5004c'], ['9730c2', 'cc0098'],
+    ['d926c7', 'cc0098'], ['fe0000', '6600cb'], ['a00000', '6600cb'], ['606060', '0000fe'],
+  ].map(([a, b]) => [a, b].map(h => [0, 2, 4].map(k => parseInt(h.slice(k, k + 2), 16))));
+  const isModel = () => radar.mode === 'model';
+  const MODEL_HOURS = 48; // ICON-EU liefert Stundenwerte für ca. 3 Tage; angezeigt werden 48 h
   const RADAR_AREA = [[44.5, 1.5], [57.5, 19.5]]; // Kartenbereich (DWD-Radar deckt Deutschland + Randgebiete ab)
   const inRadarArea = l => l.lat > 46.5 && l.lat < 55.5 && l.lon > 4.5 && l.lon < 16; // grob: Ort mit Radardaten
-  const radar = { map: null, overlay: null, frames: [], idx: 0, nowIdx: 0, timer: null, loadedAt: 0, gen: null, playing: false, autoplay: false };
+  const radar = { map: null, overlay: null, frames: [], idx: 0, nowIdx: 0, timer: null, loadedAt: 0, gen: null, playing: false, autoplay: false, mode: 'radar' };
 
   function loadLeaflet() {
     if (window.L) return Promise.resolve();
@@ -717,6 +749,14 @@
 
   // Zeitpunkte: 2 h zurück bis zum letzten Vorhersage-Zeitpunkt laut DWD (ca. +2 h)
   async function radarFrames() {
+    if (isModel()) {
+      // Modell: Stundensummen; Bild zur Zeit T = Niederschlag der Stunde bis T → erstes Bild = laufende Stunde
+      const first = Math.ceil(Date.now() / 3600e3) * 3600e3;
+      radar.frames = Array.from({ length: MODEL_HOURS }, (_, k) => first + k * 3600e3);
+      radar.nowIdx = 0;
+      $('radarSlider').max = radar.frames.length - 1;
+      return;
+    }
     let end = Date.now() + 2 * 3600e3;
     try {
       const x = await (await fetch(RADAR_CAPS)).text();
@@ -732,6 +772,7 @@
 
   // Zeitpunkt, der der aktuellen Uhrzeit am nächsten liegt (= „jetzt“ an Regler und Text)
   function radarNowIdx() {
+    if (isModel()) return 0;
     let best = 0;
     radar.frames.forEach((t, i) => { if (Math.abs(t - Date.now()) < Math.abs(radar.frames[best] - Date.now())) best = i; });
     return best;
@@ -740,16 +781,34 @@
   function radarUrl(t, b, w, h) {
     const a = L.CRS.EPSG3857.project(b.getSouthWest()), c = L.CRS.EPSG3857.project(b.getNorthEast());
     return RADAR_WMS + '?service=WMS&version=1.3.0&request=GetMap&styles=&format=image/png&transparent=true&crs=EPSG:3857'
-      + `&layers=${RADAR_LAYER}&bbox=${a.x.toFixed(0)},${a.y.toFixed(0)},${c.x.toFixed(0)},${c.y.toFixed(0)}`
+      + `&layers=${isModel() ? MODEL_LAYER : RADAR_LAYER}&bbox=${a.x.toFixed(0)},${a.y.toFixed(0)},${c.x.toFixed(0)},${c.y.toFixed(0)}`
       + `&width=${w}&height=${h}&time=${new Date(t).toISOString().replace('.000', '')}`;
   }
   // Bilder für den aktuellen Ausschnitt vorladen, damit die Animation flüssig läuft.
   // („keine Daten“ liefert der DWD bereits halbtransparent grau – keine Nachbearbeitung nötig)
+  // Modellbilder: DWD-Farben pixelweise auf die Radarskala umfärben (nur 24 kleine Bilder)
+  function modelRecolor(img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let k = 0; k < p.length; k += 4) {
+      if (!p[k + 3]) continue;
+      for (const [f, t] of MODEL_COLORS) {
+        if (Math.abs(p[k] - f[0]) < 10 && Math.abs(p[k + 1] - f[1]) < 10 && Math.abs(p[k + 2] - f[2]) < 10) {
+          p[k] = t[0]; p[k + 1] = t[1]; p[k + 2] = t[2]; break;
+        }
+      }
+    }
+    g.putImageData(d, 0, 0);
+    return new Promise(res => c.toBlob(b => res(b ? URL.createObjectURL(b) : null)));
+  }
   // Passen die geladenen Bilder noch? Ausschnitt liegt darin und ein Bildpunkt ist feiner als ~500 m
   // (das DWD-Radar hat 1 km Auflösung → Hineinzoomen um 1–2 Stufen bringt keine neuen Informationen)
   function radarGenFits() {
     const g = radar.gen;
-    if (!g || !radar.map) return false;
+    if (!g || !radar.map || g.mode !== radar.mode) return false;
     if (!g.bounds.contains(radar.map.getBounds())) return false;
     const a = L.CRS.EPSG3857.project(g.bounds.getSouthWest()), c = L.CRS.EPSG3857.project(g.bounds.getNorthEast());
     const mpp = (c.x - a.x) / g.w * Math.cos(g.bounds.getCenter().lat * Math.PI / 180);
@@ -759,20 +818,29 @@
     if (!radar.map || !radar.frames.length) return;
     if (!force && radarGenFits()) return; // vorhandene Bilder reichen (z. B. nach Hineinzoomen)
     const view = radar.map.getBounds(), zoom = radar.map.getZoom();
-    const bounds = view.pad(RADAR_PAD), sz = radar.map.getSize(), dpr = Math.min(1.5, devicePixelRatio || 1);
+    const bounds = view.pad(RADAR_PAD), sz = radar.map.getSize(), dpr = isModel() ? 1 : Math.min(1.5, devicePixelRatio || 1); // Modell: 7-km-Raster, kleinere Bilder genügen
     const w = Math.round(sz.x * (1 + 2 * RADAR_PAD) * dpr), h = Math.round(sz.y * (1 + 2 * RADAR_PAD) * dpr);
-    const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, bounds, zoom, w, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
+    const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, mode: radar.mode, bounds, zoom, w, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
     const old = radar.gen;
     radar.gen = gen;
+    if (old) {
+      old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
+      // noch laufende Downloads des alten Satzes abbrechen – sie würden sonst die Leitungen belegen
+      (old.imgs || []).forEach((im, i) => { if (im && !old.srcs[i]) { im.onload = im.onerror = null; im.src = ''; } });
+    }
     // Ladereihenfolge: gewähltes Bild zuerst, dann abwechselnd nach außen (davor/danach)
     const order = gen.urls.map((_, i) => i).sort((p, q) => Math.abs(p - radar.idx) - Math.abs(q - radar.idx) || q - p);
     gen.imgs = []; // Referenzen halten, damit der Browser die Bilder im Speicher behält
     order.forEach(i => {
       const u = gen.urls[i];
       const img = gen.imgs[i] = new Image();
-      img.onload = () => {
+      if (gen.mode === 'model') img.crossOrigin = 'anonymous'; // für das Umfärben per Canvas
+      img.onload = async () => {
         if (radar.gen !== gen) return; // Ausschnitt inzwischen geändert
-        gen.srcs[i] = u;
+        let src = u;
+        if (gen.mode === 'model') { try { src = (await modelRecolor(img)) || u; } catch {} }
+        if (radar.gen !== gen) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; }
+        gen.srcs[i] = src;
         if (i === radar.idx) radarShow(i);
         radarProgress();
       };
@@ -805,7 +873,9 @@
     const stamp = $('radarStamp');
     stamp.hidden = false;
     stamp.className = 'rstamp' + (i === radar.nowIdx ? ' now' : i > radar.nowIdx ? ' fc' : '');
-    stamp.textContent = hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`)
+    stamp.textContent = (isModel()
+        ? `${locHour(t / 1000 - H)} Uhr` + (i === 0 ? ' · jetzt' : ` · +${i} Std.`)
+        : hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`))
       + (!st ? ' · lädt …' : st === 'fehler' ? ' · keine Daten' : '');
   }
   // Ladefortschritt der Bilder dezent am Regler anzeigen
@@ -815,7 +885,33 @@
     $('radarSlider').style.opacity = all ? 1 : .55 + .45 * n / g.urls.length;
     $('radarSpin').hidden = all;
     $('radarSpinTxt').textContent = all ? '' : `${n}/${g.urls.length}`;
-    if (all && radar.autoplay) { radar.autoplay = false; radarShow(radar.nowIdx); radarPlay(true); } // beim Öffnen: Loop ab „jetzt“
+    // Modell (48 Bilder, DWD braucht ~1,5 s je Bild): schon starten, wenn die ersten 8 Stunden da sind –
+    // die Bilder laden ab „jetzt“ der Reihe nach, der Film wartet ggf. auf das nächste
+    const ready = all || (g.mode === 'model' && g.srcs.slice(0, 8).every(Boolean));
+    if (ready && radar.autoplay) { radar.autoplay = false; radarShow(radar.nowIdx); radarPlay(true); } // Loop ab „jetzt“
+  }
+  // Modell: Zeitmarken alle 6 Stunden unter dem Regler, um Mitternacht der Wochentag („Jetzt · 18 · Mo · 6 · 12 …“)
+  const sliderPos = (i, n) => { const f = n > 0 ? i / n : 0; return `calc(${(f * 100).toFixed(2)}% + ${((0.5 - f) * 16).toFixed(1)}px)`; };
+  function radarTicks() {
+    const box = $('radarTicks'), model = isModel();
+    box.hidden = !model; $('radarNowMark').hidden = model;
+    if (!model) return;
+    const n = radar.frames.length - 1, spans = [];
+    const px = Math.max(1, ($('radarSlider').clientWidth || 300) - 16) / Math.max(1, n); // Pixel je Stunde
+    let lastPx = -99, pendingDay = '';
+    const add = (i, txt, cls) => {
+      if (i * px - lastPx < 26) { if (cls === 'day' && i) pendingDay = txt; return; } // zu dicht: Tag merken
+      if (pendingDay) { txt = pendingDay + ' ' + txt; cls = 'day'; pendingDay = ''; } // „Mo 6“
+      lastPx = i * px;
+      const e = document.createElement('span'); e.textContent = txt; if (cls) e.className = cls; e.style.left = sliderPos(i, n); spans.push(e);
+    };
+    add(0, 'Jetzt', 'day');
+    radar.frames.forEach((t, i) => {
+      const h = locHour(t / 1000 - H); // Beginn der Stunde
+      if (i === 0 || h % 6) return;  // alle 6 h
+      if (h === 0) add(i, locWeekday(t / 1000 - H), 'day'); else add(i, String(h));
+    });
+    box.replaceChildren(...spans);
   }
   // „jetzt“ unter dem Regler an die Position des aktuellen Zeitpunkts setzen (Daumen ≈ 16 px breit)
   function radarNowMark() {
@@ -829,7 +925,7 @@
     $('radarPlay').setAttribute('aria-label', on ? 'Pause' : 'Abspielen');
     if (on) radar.timer = setTimeout(radarStep, radarDelay(radar.idx)); // aktuelles Bild erst stehen lassen
   }
-  const radarDelay = i => i === radar.nowIdx ? 1500 : i === radar.frames.length - 1 ? 1200 : 400;
+  const radarDelay = i => i === radar.nowIdx ? 1500 : i === radar.frames.length - 1 ? 1200 : isModel() ? 500 : 400;
   // ein Bild weiter (nur wenn geladen); auf „jetzt“ 1,5 s und am Ende 1,2 s verweilen
   function radarStep() {
     if (!radar.playing) return;
@@ -865,6 +961,7 @@
     const wasNow = !radar.frames.length || radar.idx === radar.nowIdx, oldT = radar.frames[radar.idx];
     await radarFrames();
     radar.loadedAt = Date.now();
+    radarTicks();
     const keep = radar.frames.indexOf(oldT);
     radar.idx = wasNow || keep < 0 ? radar.nowIdx : keep; // war „jetzt“ gewählt → wieder „jetzt“
     radarImages(true);
@@ -872,8 +969,20 @@
   }
   // Ort außerhalb der Radarabdeckung → deutlicher Hinweis statt leerer Karte
   function radarAreaNote() {
-    const out = !inRadarArea(state.loc);
-    $('radarArea').hidden = !out;
+    $('radarArea').hidden = isModel() || inRadarArea(state.loc);
+  }
+  // Umschalten Radar ±2 h ↔ Modell 48 h
+  function radarSetMode(mode) {
+    if (radar.mode === mode) return;
+    radar.mode = mode;
+    document.querySelectorAll('.rmode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
+    $('radarSub').textContent = mode === 'model' ? '(DWD-Modell ICON-EU · nächste 48 h)' : '(DWD · −2 h bis +2 h)';
+    $('radarModelNote').hidden = mode !== 'model';
+    $('radarNoData').hidden = mode === 'model';
+    radarAreaNote();
+    radarPlay(false);
+    radar.loadedAt = 0; radar.idx = 0; radar.autoplay = true;
+    radarRefresh(true);
   }
   // Ortswechsel: Karte mitführen (nur wenn schon geladen)
   function radarFollowLoc() {
@@ -1934,6 +2043,7 @@
     if ($('radarBox').open) { radar.autoplay = true; radarOpen(); } else { radar.autoplay = false; radarPlay(false); }
   });
   $('radarPlay').addEventListener('click', () => { radar.autoplay = false; radarPlay(!radar.playing); });
+  document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', () => radarSetMode(b.dataset.mode)));
   $('radarSlider').addEventListener('input', e => { radar.autoplay = false; radarPlay(false); radarShow(+e.target.value); });
   $('radarNowMark').addEventListener('click', () => { radar.autoplay = false; radarPlay(false); radarShow(radar.nowIdx); });
 
