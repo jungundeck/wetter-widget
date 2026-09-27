@@ -158,7 +158,12 @@
     position: absolute; inset: 0; z-index: 650; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,.45); color: #fff; font-size: 15px; font-weight: 600; pointer-events: none;
   }
-  .rhint[hidden] { display: none; }
+  .rhint[hidden], .rarea[hidden] { display: none; }
+  .rarea {
+    position: absolute; left: 8px; right: 8px; top: 8px; z-index: 640; pointer-events: none;
+    background: var(--card); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.25);
+  }
   .rspin {
     display: flex; align-items: center; gap: 6px;
     background: var(--card); color: var(--muted); border-radius: 12px; padding: 3px 8px 3px 5px;
@@ -367,6 +372,7 @@
         <div class="rstamp" id="radarStamp" hidden></div>
       </div>
       <div class="rhint" id="radarHint" hidden>Zum Verschieben zwei Finger verwenden</div>
+      <div class="rarea" id="radarArea" hidden>Für diesen Ort gibt es kein Regenradar – der DWD deckt nur Deutschland und die Randgebiete ab.</div>
     </div>
     <div class="radarctl">
       <button id="radarPlay" class="icon" type="button" aria-label="Abspielen">
@@ -406,7 +412,7 @@
     <div class="chart" id="ensChart">
       <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
       <div class="tip" id="ensTip"></div>
-      <div class="status" id="ensStatus">Lade Ensemble …</div>
+      <div class="status" id="ensStatus">Lade Statistik …</div>
     </div>
     <div class="legend">
       <span><i class="dot" style="background:var(--warm)"></i>Max (°C)</span>
@@ -557,7 +563,7 @@
     tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
     fetchedAt: null,
     lastAttempt: 0,
-    ens: null,  // 14-Tage-Ensemble (Mittelwerte), alle 6 h neu geladen
+    ens: null,  // 14-Tage-Statistik (Ensemble-Mittel), höchstens alle 12 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
     opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
@@ -572,7 +578,9 @@
   const fmt1 = v => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // ---------- Daten ----------
+  let loadSeq = 0;
   async function load(force) {
+    const seq = ++loadSeq; // spätere Anfrage gewinnt (z. B. schneller Ortswechsel)
     const { lat, lon } = state.loc;
     state.lastAttempt = Date.now();
     $('status').style.display = state.data ? 'none' : 'flex';
@@ -592,6 +600,7 @@
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const [data, tj] = await Promise.all([r.json(), tideReq]);
+      if (seq !== loadSeq) return; // inzwischen anderer Ort/neuerer Abruf
       const th = tj && tj.hourly && tj.hourly.sea_level_height_msl;
       state.tide = th && th.some(v => v != null) ? { t: tj.hourly.time, h: th } : null;
       if (th && !state.tide) { noTide.add(key); store.set('notide', [...noTide]); } // Antwort ohne Werte = kein Meer
@@ -601,6 +610,7 @@
       render();
       loadEns(force === true);
     } catch (e) {
+      if (seq !== loadSeq) return;
       $('status').textContent = 'Wetterdaten konnten nicht geladen werden (' + e.message + ').';
       $('status').style.display = 'flex';
     }
@@ -622,6 +632,7 @@
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const dl = (await r.json()).daily;
+      if (key !== tideKey(state.loc)) return; // Ort inzwischen gewechselt
       // je Tag: alle Läufe einer Variablen (Kontroll-Lauf + member01…50)
       const runs = v => dl.time.map((_, i) => Object.keys(dl).filter(k => k === v || k.startsWith(v + '_member'))
         .map(k => dl[k][i]).filter(x => x != null).sort((a, b) => a - b));
@@ -640,19 +651,21 @@
       store.set('ens', { key, at: Date.now(), series: state.ens });
       renderEns();
     } catch (e) {
-      $('ensStatus').textContent = 'Ensemble konnte nicht geladen werden (' + e.message + ').';
+      $('ensStatus').textContent = 'Statistik konnte nicht geladen werden (' + e.message + ').';
       $('ensStatus').style.display = 'flex';
     }
   }
 
   // ---------- Regenradar ----------
   // DWD-Radarkomposit „RV“ (Analyse + Vorhersage bis ca. +2 h, 5-min-Raster) als WMS-Bild für den
-  // sichtbaren Kartenausschnitt; alle 10 min ein Bild. Karte und Bilder werden erst beim Aufklappen geladen.
+  // sichtbaren Kartenausschnitt (+30 % Rand); ein Bild alle 5 min. Karte und Bilder erst beim Aufklappen.
   const RADAR_WMS = 'https://maps.dwd.de/geoserver/dwd/wms';
   const RADAR_LAYER = 'dwd:Radar_rv_product_1x1km_ger';
   const RADAR_CAPS = 'https://maps.dwd.de/geoserver/dwd/Radar_rv_product_1x1km_ger/ows?service=WMS&version=1.3.0&request=GetCapabilities';
   const RADAR_STEP = 5 * 60 * 1000; // volles DWD-Raster
-  const radar = { map: null, overlay: null, frames: [], urls: [], imgs: [], idx: 0, nowIdx: 0, timer: null, loadedAt: 0 };
+  const RADAR_AREA = [[44.5, 1.5], [57.5, 19.5]]; // Kartenbereich (DWD-Radar deckt Deutschland + Randgebiete ab)
+  const inRadarArea = l => l.lat > 46.5 && l.lat < 55.5 && l.lon > 4.5 && l.lon < 16; // grob: Ort mit Radardaten
+  const radar = { map: null, overlay: null, frames: [], idx: 0, nowIdx: 0, timer: null, loadedAt: 0, gen: null, playing: false, autoplay: false };
 
   function loadLeaflet() {
     if (window.L) return Promise.resolve();
@@ -669,8 +682,7 @@
   const isDark = () => document.documentElement.dataset.theme === 'dark'
     || (document.documentElement.dataset.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
 
-  // Grundkarte: basemap.de (BKG, grau, frei nutzbar, deckt Deutschland ab wie das Radar);
-  // im Dunkelmodus per Farbfilter umgekehrt
+  // Grundkarte: basemap.de (BKG, grau, frei nutzbar, deckt Deutschland ab wie das Radar)
   function radarBaseTiles() {
     if (!radar.map) return;
     if (!radar.base) {
@@ -684,7 +696,7 @@
   function radarInitMap() {
     const { lat, lon } = state.loc;
     radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11, inertia: false,
-      maxBounds: [[44.5, 1.5], [57.5, 19.5]], maxBoundsViscosity: 0.9 }).setView([lat, lon], 8); // nur Radargebiet
+      maxBounds: RADAR_AREA, maxBoundsViscosity: 0.9 }).setView([lat, lon], 8); // nur Radargebiet
     radar.map.createPane('radar').style.zIndex = 350;
     const names = radar.map.createPane('names'); names.style.zIndex = 450; names.style.pointerEvents = 'none'; // für die Ortsmarke
     radarBaseTiles();
@@ -732,21 +744,7 @@
       + `&width=${w}&height=${h}&time=${new Date(t).toISOString().replace('.000', '')}`;
   }
   // Bilder für den aktuellen Ausschnitt vorladen, damit die Animation flüssig läuft.
-  // Das hellgraue „keine Daten“-Feld des DWD (außerhalb Deutschlands) wird dabei dezent durchscheinend.
-  function radarTidy(img) {
-    const c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    const g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
-    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
-    for (let k = 0; k < p.length; k += 4) {
-      if (p[k + 3] && Math.abs(p[k] - 216) < 6 && Math.abs(p[k + 1] - 216) < 6 && Math.abs(p[k + 2] - 216) < 6) {
-        p[k] = p[k + 1] = p[k + 2] = 128; p[k + 3] = 50;
-      }
-    }
-    g.putImageData(d, 0, 0);
-    return new Promise(res => c.toBlob(b => res(b ? URL.createObjectURL(b) : null)));
-  }
+  // („keine Daten“ liefert der DWD bereits halbtransparent grau – keine Nachbearbeitung nötig)
   // Passen die geladenen Bilder noch? Ausschnitt liegt darin und ein Bildpunkt ist feiner als ~500 m
   // (das DWD-Radar hat 1 km Auflösung → Hineinzoomen um 1–2 Stufen bringt keine neuen Informationen)
   function radarGenFits() {
@@ -766,18 +764,15 @@
     const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, bounds, zoom, w, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
     const old = radar.gen;
     radar.gen = gen;
-    if (old) old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
     // Ladereihenfolge: gewähltes Bild zuerst, dann abwechselnd nach außen (davor/danach)
     const order = gen.urls.map((_, i) => i).sort((p, q) => Math.abs(p - radar.idx) - Math.abs(q - radar.idx) || q - p);
+    gen.imgs = []; // Referenzen halten, damit der Browser die Bilder im Speicher behält
     order.forEach(i => {
       const u = gen.urls[i];
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = async () => {
-        let src = u;
-        try { src = (await radarTidy(img)) || u; } catch {}
-        if (radar.gen !== gen) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; } // veraltet
-        gen.srcs[i] = src;
+      const img = gen.imgs[i] = new Image();
+      img.onload = () => {
+        if (radar.gen !== gen) return; // Ausschnitt inzwischen geändert
+        gen.srcs[i] = u;
         if (i === radar.idx) radarShow(i);
         radarProgress();
       };
@@ -789,7 +784,9 @@
   // wird ein neues Overlay mit passenden Grenzen angelegt und das alte erst dann entfernt (kein Versatz).
   function radarDisplay(i) {
     const gen = radar.gen, src = gen && gen.srcs[i];
+    if (src === 'fehler' && radar.overlay) { radar.overlay.setOpacity(0); return; } // kein falsches Bild zeigen
     if (!src || src === 'fehler') return;
+    if (radar.overlay) radar.overlay.setOpacity(0.8);
     if (!radar.overlay || radar.overlayGen !== gen) {
       const ov = L.imageOverlay(src, gen.bounds, { opacity: 0.8, pane: 'radar' }).addTo(radar.map);
       if (radar.overlay) radar.map.removeLayer(radar.overlay);
@@ -855,6 +852,7 @@
         radarProgress(); // startet den Loop, wenn alles da ist
       } else await radarRefresh(true);
       $('radarStatus').style.display = 'none';
+      radarAreaNote();
     } catch (e) {
       $('radarStatus').textContent = 'Radar konnte nicht geladen werden (' + e.message + ').';
       $('radarSpin').hidden = true;
@@ -872,8 +870,14 @@
     radarImages(true);
     radarShow(radar.idx);
   }
+  // Ort außerhalb der Radarabdeckung → deutlicher Hinweis statt leerer Karte
+  function radarAreaNote() {
+    const out = !inRadarArea(state.loc);
+    $('radarArea').hidden = !out;
+  }
   // Ortswechsel: Karte mitführen (nur wenn schon geladen)
   function radarFollowLoc() {
+    radarAreaNote();
     if (!radar.map) return;
     const ll = [state.loc.lat, state.loc.lon];
     radar.marker.setLatLng(ll);
@@ -1030,7 +1034,23 @@
 
   const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const mix = (a, b, f) => 'rgb(' + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(',') + ')';
-  const hhmm = (t, off) => new Date((t + off) * 1000).toISOString().slice(11, 16);
+  // Uhrzeiten in der echten Zeitzone des Orts (Open-Meteo liefert z. B. „Europe/Berlin“) – damit stimmen
+  // Stunden auch über eine Zeitumstellung hinweg (fester Versatz wäre danach 1 h daneben)
+  let tzCache = null;
+  function tz() {
+    const zone = (state.data && state.data.timezone) || 'UTC';
+    if (!tzCache || tzCache.zone !== zone) {
+      const f = o => new Intl.DateTimeFormat('de-DE', { timeZone: zone, ...o });
+      tzCache = { zone, hm: f({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }), h: new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', hourCycle: 'h23' }), // nur Zahl („07“), ohne „Uhr“
+        wd: f({ weekday: 'short' }), dm: f({ weekday: 'short', day: '2-digit', month: '2-digit' }),
+        wdEn: new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }) };
+    }
+    return tzCache;
+  }
+  const hhmm = t => tz().hm.format(t * 1000);                     // „07:10“ (t in Sekunden)
+  const locHour = t => +(tz().h.formatToParts(t * 1000).find(p => p.type === 'hour') || { value: 0 }).value % 24; // Stunde 0–23
+  const locWeekday = t => tz().wd.format(t * 1000).replace('.', ''); // „Mo“
+  const isWeekend = t => /Sat|Sun/.test(tz().wdEn.format(t * 1000));
 
   // Windfarbe nach Stärke (km/h, grob nach Beaufort): schwach grau, mäßig grün, frisch orange, stürmisch rot
   const CLOUD_MAX_PX = 43; // max. Dicke der Wolken-Spindel in px
@@ -1172,7 +1192,7 @@
     for (let k = 1; k < 24; k++) el('line', { x1: x(t0 + k * H), x2: x(t0 + k * H), y1: m.t, y2: m.t + ph }, hgrid);
     for (let k = 1; k < 24; k++) {
       const t = t0 + k * H;
-      const hr = new Date((t + off) * 1000).getUTCHours();
+      const hr = locHour(t);
       if (hr === 0 || hr === 12)
         el('line', { x1: x(t), x2: x(t), y1: m.t, y2: m.t + ph, stroke: hr === 0 ? 'rgba(140,140,140,.75)' : 'rgba(140,140,140,.5)', 'stroke-width': 1 }, plot);
     }
@@ -1343,7 +1363,7 @@
       const syms = el('g', { 'font-size': FS, 'text-anchor': 'middle' }, plot);
       for (let k = 0; k <= 24; k++) {
         const t = t0 + k * H;
-        if (new Date((t + off) * 1000).getUTCHours() % symEvery !== 0 || x(t) - m.l < 12 || m.l + pw - x(t) < 12) continue;
+        if (locHour(t) % symEvery !== 0 || x(t) - m.l < 12 || m.l + pw - x(t) < 12) continue;
         const w = wmo(wc[idx[k]]);
         if (!w) continue;
         symK.push(k);
@@ -1429,12 +1449,12 @@
     // Zeitachse: stündlich (bei wenig Platz alle 2 bzw. 4 h); Mitternacht mit Wochentag
     for (let k = 0; k < 24; k++) {
       const t = t0 + k * H;
-      const hr = new Date((t + off) * 1000).getUTCHours();
+      const hr = locHour(t);
       if (hr % tStep !== 0) continue;
       const lbl = el('text', { x: x(t), y: m.t + ph + PROB_H + 16, 'text-anchor': 'middle', 'font-size': tStep === 1 ? 10 : 11 }, ax);
       if (hr === 0) {
         lbl.setAttribute('class', 'strong');
-        lbl.textContent = new Date((t + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' });
+        lbl.textContent = locWeekday(t);
       } else lbl.textContent = String(hr);
     }
 
@@ -1446,7 +1466,7 @@
       const ay = m.t + ph + PROB_H + 31; // dicht unter der Zeitachse
       for (let k = 0; k <= 24; k++) {
         const t = t0 + k * H, i = idx[k];
-        const hr = new Date((t + off) * 1000).getUTCHours();
+        const hr = locHour(t);
         if (hr % every !== 0 || x(t) - m.l < 12 || m.l + pw - x(t) < 12) continue;
         const v = ws[i], dir = wd[i], g = wg ? wg[i] : null;
         if (v == null) continue;
@@ -1489,7 +1509,7 @@
     view.dot.setAttribute('cx', cx); view.dot.setAttribute('cy', cy);
     view.dot.setAttribute('stroke', view.temps[k] < 0 ? css('--cold') : css('--warm'));
     view.dot.setAttribute('visibility', 'visible');
-    const hh = String(new Date((t + view.off) * 1000).getUTCHours()).padStart(2, '0');
+    const hh = String(locHour(t)).padStart(2, '0');
     const p = d.hourly.precipitation_probability[i], mm = d.hourly.precipitation[i];
     const tip = $('tip');
     const w = d.hourly.weather_code ? wmo(d.hourly.weather_code[i]) : null;
@@ -1574,14 +1594,14 @@
     const span = Math.max(4, hi - lo);
     const padT = 24, padB = 26;
     const yT = v => HEAD + padT + (hi - v) / span * (PH - padT - padB);
-    const day = j => new Date((ser.time[j] + off) * 1000);
+    const noon = j => ser.time[j] + 12 * H; // Mittag des Tages (robust gegen Zeitumstellung)
 
     for (let j = 0; j < n; j++) {
-      const wd = day(j).getUTCDay(), we = wd === 0 || wd === 6;
+      const we = isWeekend(noon(j));
       if (we) el('rect', { x: j * cw, y: 0, width: cw, height: HEAD + PH, fill: css('--weekend') }, svg);
       const t = el('text', { x: cx(j), y: 15, 'text-anchor': 'middle', 'font-size': small ? 11 : 13,
         'font-weight': we || j === 0 ? 700 : 400, fill: css('--text') }, svg);
-      t.textContent = day(j).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' }).replace('.', '');
+      t.textContent = locWeekday(noon(j));
     }
 
     // Spannen der Läufe (nur Ensemble)
@@ -1642,7 +1662,7 @@
     const rect = $(id + 'Svg').getBoundingClientRect();
     const j = Math.floor((ev.clientX - rect.left) * (v.W / rect.width) / v.cw);
     if (j < 0 || j >= v.n) return hideTrendTip(id);
-    const date = new Date((ser.time[j] + off) * 1000).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+    const date = tz().dm.format((ser.time[j] + 12 * H) * 1000);
     const range = (a, b) => a && b ? ` <small>(${Math.round(a[j])}–${Math.round(b[j])})</small>` : '';
     const tip = $(id + 'Tip');
     tip.innerHTML = `<b>${date}</b> · <span style="color:var(--warm)">${fmt1(ser.max[j])}°</span>${range(ser.maxLo, ser.maxHi)} / `
@@ -1747,7 +1767,7 @@
     state.tide = null;
     state.offset = 0;
     state.ens = null;
-    $('ensStatus').textContent = 'Lade Ensemble …';
+    $('ensStatus').textContent = 'Lade Statistik …';
     $('ensStatus').style.display = 'flex';
     $('name').textContent = loc.name;
     $('status').textContent = 'Lade Wetterdaten …';
@@ -1764,6 +1784,7 @@
     searchTimer = setTimeout(() => search(q), 250);
   });
   $('q').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { toggleSearch(false); return; }
     const lis = $('results').children;
     if (!lis.length) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1772,16 +1793,17 @@
       [...lis].forEach((li, i) => li.classList.toggle('active', i === active));
     } else if (e.key === 'Enter') {
       pick(results[Math.max(0, active)]);
-    } else if (e.key === 'Escape') {
-      $('results').replaceChildren();
     }
   });
   document.addEventListener('click', e => { if (!e.target.closest('.search')) $('results').replaceChildren(); });
 
+  let searchSeq = 0;
   async function search(q) {
+    const seq = ++searchSeq;
     try {
       const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=de&format=json`);
       const j = await r.json();
+      if (seq !== searchSeq) return; // Antwort auf eine ältere Eingabe
       results = j.results || [];
       active = -1;
       $('results').replaceChildren(...(results.length ? results.map((g, i) => {
