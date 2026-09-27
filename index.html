@@ -152,7 +152,15 @@
   .radarmap .status { z-index: 500; pointer-events: none; }
   .radarctl { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; }
   .radarctl button.icon { width: 38px; height: 38px; }
-  .radarctl input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .radarctl .rslider { position: relative; flex: 1; min-width: 0; padding-bottom: 12px; }
+  .radarctl input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
+  .radarctl .nowmark {
+    position: absolute; top: 18px; transform: translateX(-50%); border: 0; background: none; padding: 0;
+    font-size: 10px; color: var(--muted); cursor: pointer;
+  }
+  .radarctl .nowmark::before {
+    content: ""; position: absolute; left: 50%; top: -7px; width: 1.5px; height: 6px; background: var(--muted);
+  }
   .radarctl .rtime { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 128px; text-align: right; }
   .radarctl .rtime b { color: var(--text); font-weight: 600; }
   .rscale { gap: 4px 10px; font-size: 11px; }
@@ -328,7 +336,10 @@
       <button id="radarPlay" class="icon" type="button" aria-label="Abspielen">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path id="radarPlayIcon" d="M8 5v14l11-7z" fill="currentColor"/></svg>
       </button>
-      <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
+      <div class="rslider">
+        <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
+        <button type="button" class="nowmark" id="radarNowMark" title="Zur aktuellen Zeit">jetzt</button>
+      </div>
       <span class="rtime" id="radarTime">–</span>
     </div>
     <div class="legend rscale">
@@ -604,7 +615,8 @@
 
   function radarInitMap() {
     const { lat, lon } = state.loc;
-    radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11 }).setView([lat, lon], 8);
+    radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11, inertia: false,
+      maxBounds: [[44.5, 1.5], [57.5, 19.5]], maxBoundsViscosity: 0.9 }).setView([lat, lon], 8); // nur Radargebiet
     radar.map.createPane('radar').style.zIndex = 350;
     const names = radar.map.createPane('names'); names.style.zIndex = 450; names.style.pointerEvents = 'none'; // für die Ortsmarke
     radarBaseTiles();
@@ -652,35 +664,47 @@
   }
   function radarImages() {
     if (!radar.map || !radar.frames.length) return;
-    (radar.srcs || []).forEach(u => u && URL.revokeObjectURL(u));
-    radar.bounds = radar.map.getBounds();
-    radar.urls = radar.frames.map(radarUrl);
-    const gen = radar.gen = (radar.gen || 0) + 1;
-    radar.srcs = radar.urls.map(() => null);
-    radar.urls.forEach((u, i) => {
+    const bounds = radar.map.getBounds();
+    const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, bounds, urls: radar.frames.map(radarUrl), srcs: [] };
+    const old = radar.gen;
+    radar.gen = gen;
+    if (old) old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
+    gen.urls.forEach((u, i) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = async () => {
-        let src = null;
-        try { src = await radarTidy(img); } catch {}
-        if (gen !== radar.gen) { if (src) URL.revokeObjectURL(src); return; } // Ausschnitt inzwischen geändert
-        radar.srcs[i] = src;
-        if (i === radar.idx) radarShow(i);
+        let src = u;
+        try { src = (await radarTidy(img)) || u; } catch {}
+        if (radar.gen !== gen) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; } // veraltet
+        gen.srcs[i] = src;
+        if (i === radar.idx) radarDisplay(i);
       };
       img.src = u;
     });
-    radarShow(radar.idx);
+  }
+  // Bild anzeigen – aber nur, wenn es für den aktuellen Ausschnitt schon geladen ist. Bei neuem Ausschnitt
+  // wird ein neues Overlay mit passenden Grenzen angelegt und das alte erst dann entfernt (kein Versatz).
+  function radarDisplay(i) {
+    const gen = radar.gen, src = gen && gen.srcs[i];
+    if (!src) return;
+    if (!radar.overlay || radar.overlayGen !== gen) {
+      const ov = L.imageOverlay(src, gen.bounds, { opacity: 0.8, pane: 'radar' }).addTo(radar.map);
+      if (radar.overlay) radar.map.removeLayer(radar.overlay);
+      radar.overlay = ov; radar.overlayGen = gen;
+    } else radar.overlay.setUrl(src);
   }
   function radarShow(i) {
     radar.idx = i;
     $('radarSlider').value = i;
-    const src = (radar.srcs && radar.srcs[i]) || radar.urls[i];
-    if (!src) return;
-    if (!radar.overlay) radar.overlay = L.imageOverlay(src, radar.bounds, { opacity: 0.8, pane: 'radar' }).addTo(radar.map);
-    else { radar.overlay.setBounds(radar.bounds); radar.overlay.setUrl(src); }
+    radarDisplay(i);
     const t = radar.frames[i], d = Math.round((t - Date.now()) / 60000);
     const off = state.data ? state.data.utc_offset_seconds : 0;
     $('radarTime').innerHTML = `<b>${hhmm(t / 1000, off)}</b> · ` + (d > 4 ? `Vorhersage +${d} min` : d < -9 ? `vor ${-d} min` : 'jetzt');
+  }
+  // „jetzt“ unter dem Regler an die Position des aktuellen Zeitpunkts setzen (Daumen ≈ 16 px breit)
+  function radarNowMark() {
+    const n = radar.frames.length - 1, f = n > 0 ? radar.nowIdx / n : 0;
+    $('radarNowMark').style.left = `calc(${(f * 100).toFixed(2)}% + ${((0.5 - f) * 16).toFixed(1)}px)`;
   }
   function radarPlay(on) {
     clearInterval(radar.timer); radar.timer = null;
@@ -700,6 +724,8 @@
         radar.idx = radar.nowIdx;
       }
       radarImages();
+      radarShow(radar.idx);
+      radarNowMark();
       $('radarStatus').style.display = 'none';
     } catch (e) {
       $('radarStatus').textContent = 'Radar konnte nicht geladen werden (' + e.message + ').';
@@ -1720,6 +1746,7 @@
   $('radarBox').addEventListener('toggle', () => { if ($('radarBox').open) radarOpen(); else radarPlay(false); });
   $('radarPlay').addEventListener('click', () => radarPlay(!radar.timer));
   $('radarSlider').addEventListener('input', e => { radarPlay(false); radarShow(+e.target.value); });
+  $('radarNowMark').addEventListener('click', () => { radarPlay(false); radarShow(radar.nowIdx); });
 
   // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
   const boxes = store.get('boxes') || {};
