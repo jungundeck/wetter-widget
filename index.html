@@ -150,6 +150,25 @@
   .radarmap { position: relative; height: min(62vh, 380px); border-radius: 10px; overflow: hidden; background: var(--cell); }
   #radarMap { position: absolute; inset: 0; }
   .radarmap .status { z-index: 500; pointer-events: none; }
+  .rspin {
+    position: absolute; top: 8px; right: 8px; z-index: 600; display: flex; align-items: center; gap: 6px;
+    background: var(--card); color: var(--muted); border-radius: 12px; padding: 3px 8px 3px 5px;
+    font-size: 11px; font-variant-numeric: tabular-nums; box-shadow: 0 1px 4px rgba(0,0,0,.2); pointer-events: none;
+  }
+  .rspin[hidden], .rstamp[hidden] { display: none; }
+  .rspin i {
+    width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: rspin .8s linear infinite;
+  }
+  @keyframes rspin { to { transform: rotate(360deg); } }
+  /* Zeitstempel auf der Karte; das „jetzt“-Bild ist blau hervorgehoben */
+  .rstamp {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 600; pointer-events: none;
+    background: rgba(28,28,30,.72); color: #fff; border-radius: 12px; padding: 3px 10px;
+    font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .rstamp.now { background: var(--accent); box-shadow: 0 0 0 3px rgba(10,132,255,.3); }
+  .rstamp.fc { background: rgba(28,28,30,.55); font-weight: 500; }
   .radarctl { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; }
   .radarctl button.icon { width: 38px; height: 38px; }
   .radarctl .rslider { position: relative; flex: 1; min-width: 0; padding-bottom: 12px; }
@@ -332,6 +351,8 @@
     <div class="radarmap">
       <div id="radarMap"></div>
       <div class="status" id="radarStatus">Lade Radar …</div>
+      <div class="rspin" id="radarSpin" hidden title="Radarbilder werden geladen"><i></i><span id="radarSpinTxt"></span></div>
+      <div class="rstamp" id="radarStamp" hidden></div>
     </div>
     <div class="radarctl">
       <button id="radarPlay" class="icon" type="button" aria-label="Abspielen">
@@ -451,7 +472,7 @@
 
       <h3>Regenradar</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect width="72" height="28" fill="#e9ecef"/><path d="M8 20 C14 6 30 4 38 10 S52 26 64 16" fill="none" stroke="#4db31b" stroke-width="7" stroke-linecap="round"/><circle cx="36" cy="10" r="3" fill="#ffff01"/><circle cx="36" cy="10" r="1.5" fill="#ff8901"/><circle cx="20" cy="18" r="3" fill="#007aff" stroke="#fff"/></svg></div>
-        <p>Radarbild des Deutschen Wetterdienstes: die letzten 2 Stunden gemessen, danach bis etwa 2 Stunden <b>Vorhersage</b>, alle 5 Minuten ein Bild; offen wird es alle 5 Minuten aktualisiert. ▶ spielt die Bilder ab, mit dem Regler wählst du einen Zeitpunkt. Farben: <span style="color:#019934">grün</span> leichter Regen, <b>gelb/orange</b> kräftig, <span style="color:#fe0000">rot/violett</span> Starkregen oder Gewitter. Grau = außerhalb der deutschen Radarabdeckung. Die Karte wird erst beim Aufklappen geladen.</p></div>
+        <p>Radarbild des Deutschen Wetterdienstes: die letzten 2 Stunden gemessen, danach bis etwa 2 Stunden <b>Vorhersage</b>, alle 5 Minuten ein Bild; offen wird es alle 5 Minuten aktualisiert. Beim Öffnen läuft der Film automatisch los, sobald alle Bilder geladen sind (Rädchen oben rechts); auf dem aktuellen Bild – blau markiert „jetzt“ – bleibt er kurz stehen. ⏸ hält an, mit dem Regler wählst du einen Zeitpunkt. Farben: <span style="color:#019934">grün</span> leichter Regen, <b>gelb/orange</b> kräftig, <span style="color:#fe0000">rot/violett</span> Starkregen oder Gewitter. Grau = außerhalb der deutschen Radarabdeckung. Die Karte wird erst beim Aufklappen geladen.</p></div>
 
       <h3>14-Tage-Trends</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="0" width="24" height="22" fill="rgba(90,130,190,.12)"/><circle cx="12" cy="6" r="2.5" fill="#ff3b30"/><circle cx="36" cy="4" r="2.5" fill="#ff3b30"/><circle cx="60" cy="9" r="2.5" fill="#ff3b30"/><circle cx="12" cy="17" r="2.5" fill="#007aff"/><circle cx="36" cy="15" r="2.5" fill="#007aff"/><circle cx="60" cy="19" r="2.5" fill="#007aff"/><rect x="0" y="23" width="23" height="5" fill="rgba(252,242,40,1)"/><rect x="24" y="23" width="23" height="5" fill="rgba(252,242,40,.3)"/><rect x="48" y="23" width="24" height="5" fill="#ececec"/></svg></div>
@@ -716,6 +737,10 @@
     const t = radar.frames[i], d = Math.round((t - Date.now()) / 60000);
     const off = state.data ? state.data.utc_offset_seconds : 0;
     const st = radar.gen && radar.gen.srcs[i];
+    const stamp = $('radarStamp');
+    stamp.hidden = false;
+    stamp.className = 'rstamp' + (i === radar.nowIdx ? ' now' : i > radar.nowIdx ? ' fc' : '');
+    stamp.textContent = hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`);
     $('radarTime').innerHTML = `<b>${hhmm(t / 1000, off)}</b> · `
       + (i === radar.nowIdx ? 'jetzt' : i > radar.nowIdx ? `Vorhersage +${d} min` : `vor ${-d} min`)
       + (!st ? ' <span class="rload">· lädt …</span>' : st === 'fehler' ? ' <span class="rload">· keine Daten</span>' : '');
@@ -723,8 +748,11 @@
   // Ladefortschritt der Bilder dezent am Regler anzeigen
   function radarProgress() {
     const g = radar.gen; if (!g) return;
-    const n = g.srcs.filter(Boolean).length;
-    $('radarSlider').style.opacity = n < g.urls.length ? .55 + .45 * n / g.urls.length : 1;
+    const n = g.srcs.filter(Boolean).length, all = n >= g.urls.length;
+    $('radarSlider').style.opacity = all ? 1 : .55 + .45 * n / g.urls.length;
+    $('radarSpin').hidden = all;
+    $('radarSpinTxt').textContent = all ? '' : `${n}/${g.urls.length}`;
+    if (all && radar.autoplay) { radar.autoplay = false; radarPlay(true); } // beim Öffnen: Loop starten
   }
   // „jetzt“ unter dem Regler an die Position des aktuellen Zeitpunkts setzen (Daumen ≈ 16 px breit)
   function radarNowMark() {
@@ -732,17 +760,24 @@
     $('radarNowMark').style.left = `calc(${(f * 100).toFixed(2)}% + ${((0.5 - f) * 16).toFixed(1)}px)`;
   }
   function radarPlay(on) {
-    clearInterval(radar.timer); radar.timer = null;
+    clearTimeout(radar.timer); radar.timer = null;
+    radar.playing = on;
     $('radarPlayIcon').setAttribute('d', on ? 'M7 5h4v14H7zM13 5h4v14h-4z' : 'M8 5v14l11-7z');
     $('radarPlay').setAttribute('aria-label', on ? 'Pause' : 'Abspielen');
-    if (on) radar.timer = setInterval(() => {
-      const next = (radar.idx + 1) % radar.frames.length;
-      if (radar.gen && radar.gen.srcs[next]) radarShow(next); // sonst warten, bis es geladen ist
-    }, 400);
+    if (on) radarStep();
+  }
+  // ein Bild weiter (nur wenn geladen); auf „jetzt“ 1,5 s und am Ende 1,2 s verweilen
+  function radarStep() {
+    if (!radar.playing) return;
+    const n = radar.frames.length, next = (radar.idx + 1) % n;
+    if (radar.gen && radar.gen.srcs[next]) radarShow(next);
+    const delay = radar.idx === radar.nowIdx ? 1500 : radar.idx === n - 1 ? 1200 : 400;
+    radar.timer = setTimeout(radarStep, delay);
   }
 
   async function radarOpen() {
     $('radarStatus').textContent = 'Lade Radar …'; $('radarStatus').style.display = 'flex';
+    $('radarSpin').hidden = false; $('radarSpinTxt').textContent = '';
     try {
       await loadLeaflet();
       if (!radar.map) radarInitMap(); else { radar.map.invalidateSize(); radarBaseTiles(); }
@@ -750,6 +785,7 @@
       $('radarStatus').style.display = 'none';
     } catch (e) {
       $('radarStatus').textContent = 'Radar konnte nicht geladen werden (' + e.message + ').';
+      $('radarSpin').hidden = true;
     }
   }
   // Zeitachse und Bilder erneuern (DWD liefert alle 5 min neue Bilder); force = auch wenn erst kürzlich geladen
@@ -1778,10 +1814,12 @@
 
   new ResizeObserver(() => render()).observe($('chart'));
   // Regenradar: immer zugeklappt beim Start, lädt erst beim Öffnen; zu = Animation anhalten
-  $('radarBox').addEventListener('toggle', () => { if ($('radarBox').open) radarOpen(); else radarPlay(false); });
-  $('radarPlay').addEventListener('click', () => radarPlay(!radar.timer));
-  $('radarSlider').addEventListener('input', e => { radarPlay(false); radarShow(+e.target.value); });
-  $('radarNowMark').addEventListener('click', () => { radarPlay(false); radarShow(radar.nowIdx); });
+  $('radarBox').addEventListener('toggle', () => {
+    if ($('radarBox').open) { radar.autoplay = true; radarOpen(); } else { radar.autoplay = false; radarPlay(false); }
+  });
+  $('radarPlay').addEventListener('click', () => { radar.autoplay = false; radarPlay(!radar.playing); });
+  $('radarSlider').addEventListener('input', e => { radar.autoplay = false; radarPlay(false); radarShow(+e.target.value); });
+  $('radarNowMark').addEventListener('click', () => { radar.autoplay = false; radarPlay(false); radarShow(radar.nowIdx); });
 
   // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
   const boxes = store.get('boxes') || {};
