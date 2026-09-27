@@ -930,9 +930,10 @@
     $('radarSpinTxt').textContent = all ? '' : `${n}/${g.urls.length}`;
     // Modell (48 Bilder, DWD braucht ~1,5 s je Bild): schon starten, wenn die ersten 8 Stunden da sind –
     // die Bilder laden ab „jetzt“ der Reihe nach, der Film wartet ggf. auf das nächste
-    // Radar: starten, sobald die Zukunft (ab „jetzt“) komplett da ist; Modell: nach den ersten 8 Stunden
+    // Radar: starten, sobald „jetzt“ bis +60 min lückenlos da ist; Modell: nach den ersten 8 Stunden
     const loaded = (a, b) => { for (let i = a; i < b; i++) if (!g.srcs[i]) return false; return true; }; // Array hat Lücken → einzeln prüfen
-    const ready = all || (g.mode === 'model' ? loaded(0, Math.min(8, g.urls.length)) : loaded(radar.nowIdx, g.urls.length));
+    const ready = all || (g.mode === 'model' ? loaded(0, Math.min(8, g.urls.length))
+      : loaded(radar.nowIdx, Math.min(g.urls.length, radar.nowIdx + Math.round(60 * 60e3 / RADAR_STEP) + 1)));
     if (ready && radar.autoplay) { radar.autoplay = false; radarShow(radar.nowIdx); radarPlay(true); } // Loop ab „jetzt“
   }
   // Modell: Zeitmarken alle 6 Stunden unter dem Regler, um Mitternacht der Wochentag („Jetzt · 18 · Mo · 6 · 12 …“)
@@ -987,7 +988,8 @@
     if (!radar.playing) return;
     const n = radar.frames.length;
     let next = radar.idx + 1;
-    if (next >= n || (next <= radar.nowIdx && !(radar.gen && radar.gen.srcs[next]))) next = radarLoopStart(); // Ende → zurück zum Anfang des geladenen Blocks
+    // Ende oder Lücke → zurück zum Anfang des lückenlos geladenen Blocks (die Schleife wächst, sobald Lücken geladen sind)
+    if (next >= n || !(radar.gen && radar.gen.srcs[next])) next = radarLoopStart();
     if (radar.gen && radar.gen.srcs[next]) radarShow(next);
     radar.timer = setTimeout(radarStep, radarDelay(radar.idx));
   }
