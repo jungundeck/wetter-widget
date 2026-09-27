@@ -190,7 +190,24 @@
   .radarctl { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; }
   .radarctl button.icon { width: 38px; height: 38px; }
   .radarctl .rslider { position: relative; flex: 1; min-width: 0; padding-bottom: 12px; }
-  .radarctl input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
+  /* Regler mit eigener Spur: ein Abschnitt je Bild (blau geladen, grau lädt, rot Fehler) */
+  .radarctl input[type=range] {
+    position: relative; z-index: 1; width: 100%; height: 18px; margin: 0; background: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  .radarctl input[type=range]::-webkit-slider-runnable-track { height: 18px; background: transparent; }
+  .radarctl input[type=range]::-moz-range-track { height: 18px; background: transparent; }
+  .radarctl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%;
+    background: var(--card); border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer;
+  }
+  .radarctl input[type=range]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--accent); cursor: pointer;
+  }
+  .rtrack { position: absolute; left: 8px; right: 8px; top: 6px; height: 6px; } /* 8 px = halbe Knopfbreite */
+  .rtrack i { position: absolute; top: 0; height: 6px; background: var(--border); border-radius: 1px; }
+  .rtrack i.ok { background: rgba(10,132,255,.55); }
+  .rtrack i.err { background: #ff3b30; }
   .radarctl .rticks { position: absolute; left: 0; right: 0; top: 18px; height: 14px; }
   .radarctl .rticks[hidden], .legend span[hidden] { display: none; }
   .radarctl .rticks span {
@@ -399,6 +416,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path id="radarPlayIcon" d="M8 5v14l11-7z" fill="currentColor"/></svg>
       </button>
       <div class="rslider">
+        <div class="rtrack" id="radarTrack" aria-hidden="true"></div>
         <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
         <button type="button" class="nowmark" id="radarNowMark" title="Zur aktuellen Zeit">jetzt</button>
         <div class="rticks" id="radarTicks" hidden></div>
@@ -828,6 +846,7 @@
     const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, mode: radar.mode, bounds, zoom, w, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
     const old = radar.gen;
     radar.gen = gen;
+    radarTrack();
     if (old) {
       old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
       // noch laufende Downloads des alten Satzes abbrechen – sie würden sonst die Leitungen belegen
@@ -884,10 +903,25 @@
       + (!st ? ' · lädt …' : st === 'fehler' ? ' · keine Daten' : '');
   }
   // Ladefortschritt der Bilder dezent am Regler anzeigen
+  // Spur des Reglers: ein Abschnitt je Bild, mittig unter der jeweiligen Reglerposition
+  function radarTrack() {
+    const g = radar.gen, n = radar.frames.length;
+    if (!g || !n) { $('radarTrack').replaceChildren(); return; }
+    const step = 100 / Math.max(1, n - 1);
+    const segs = radar.frames.map((_, i) => {
+      const e = document.createElement('i');
+      const a = Math.max(0, (i - 0.5) * step), b = Math.min(100, (i + 0.5) * step);
+      e.style.left = `calc(${a.toFixed(3)}% + 0.5px)`; e.style.width = `calc(${(b - a).toFixed(3)}% - 1px)`;
+      const src = g.srcs[i];
+      if (src === 'fehler') e.className = 'err'; else if (src) e.className = 'ok';
+      return e;
+    });
+    $('radarTrack').replaceChildren(...segs);
+  }
   function radarProgress() {
     const g = radar.gen; if (!g) return;
     const n = g.srcs.filter(Boolean).length, all = n >= g.urls.length;
-    $('radarSlider').style.opacity = all ? 1 : .55 + .45 * n / g.urls.length;
+    radarTrack();
     $('radarSpin').hidden = all;
     $('radarSpinTxt').textContent = all ? '' : `${n}/${g.urls.length}`;
     // Modell (48 Bilder, DWD braucht ~1,5 s je Bild): schon starten, wenn die ersten 8 Stunden da sind –
