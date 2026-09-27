@@ -241,8 +241,6 @@
     --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --border: #38383a; --input: #2c2c2e;
     color-scheme: dark; background: var(--card); color: var(--text);
   }
-  .widget.hourly .head { padding-right: 46px; }
-  .hbtn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; z-index: 2; }
   .tab.edit.on { background: var(--accent); color: #fff; }
   .settings {
     background: var(--input); border: 1px solid var(--border); border-radius: 10px;
@@ -261,6 +259,7 @@
   .settings label { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; }
   .settings input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
   .settings label.sel { justify-content: space-between; }
+  .settings .appver + .appver { border-top: 0; margin-top: 0; }
   .settings .appver { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0 2px;
     border-top: 1px solid var(--border); margin-top: 4px; }
   .settings .appver button { padding: 5px 12px; }
@@ -342,9 +341,6 @@
     </div>
   </div>
   <section class="widget hourly" aria-label="Wetter-Widget">
-    <button id="reload" class="icon hbtn" title="Aktualisieren" aria-label="Aktualisieren">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
     <div class="head">
       <div class="line1">
         <span class="name" id="name">–</span><span class="elev" id="elev"></span>
@@ -448,6 +444,10 @@
         <label class="sel">Beim Start zeigen
           <select id="startLoc"></select></label>
         <div class="sel appver">
+          <span>Wetterdaten <small id="dataAge"></small></span>
+          <button id="reload" type="button">Aktualisieren</button>
+        </div>
+        <div class="sel appver">
           <span>App-Version <small id="appVer"></small></span>
           <button id="appReload" type="button">Neu laden</button>
         </div>
@@ -505,7 +505,7 @@
         <p><b>14-Tage-Trend · Statistik</b>: Der Wetterdienst rechnet dieselbe Vorhersage 51-mal, jedes Mal mit minimal veränderten Startwerten. Die Punkte sind der Durchschnitt – ruhiger und für die zweite Woche meist verlässlicher. Die farbige Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Schmal = die Rechnungen sind sich einig, breit = unsicher.</p></div>
 
       <h3>Gut zu wissen</h3>
-      <p class="plain">Alle Werte sind Modellvorhersagen für den gewählten Punkt, keine Messwerte. Nachts kann es in Senken einige Grad kälter sein als angezeigt. Die Seite lädt stündlich neu (das Ensemble alle 12 Stunden), der ↻-Knopf sofort. Orte, Einstellungen und Aufklapp-Zustände werden nur in diesem Browser gespeichert.</p>
+      <p class="plain">Alle Werte sind Modellvorhersagen für den gewählten Punkt, keine Messwerte. Nachts kann es in Senken einige Grad kälter sein als angezeigt. Die Seite lädt stündlich neu (die Statistik alle 12 Stunden). Sofort aktualisieren: den aktiven Ort oben noch einmal antippen oder Einstellungen → Wetterdaten aktualisieren. Orte, Einstellungen und Aufklapp-Zustände werden nur in diesem Browser gespeichert.</p>
     </div>
   </details>
   </section>
@@ -607,7 +607,7 @@
   }
 
   // ECMWF-Ensemble (51 Läufe) für einen ruhigeren 14-Tage-Trend. Neue Läufe kommen nur wenige Male
-  // am Tag → pro Ort höchstens alle 12 h abrufen (oder über den ↻-Knopf) und im Browser zwischenspeichern.
+  // am Tag → pro Ort höchstens alle 12 h abrufen (oder über „Aktualisieren“) und im Browser zwischenspeichern.
   const ENS_MAX_AGE = 12 * 3600 * 1000;
   async function loadEns(force) {
     if (!$('ensBox').open) return; // zugeklappt: nichts abrufen, erst beim Aufklappen
@@ -747,12 +747,23 @@
     g.putImageData(d, 0, 0);
     return new Promise(res => c.toBlob(b => res(b ? URL.createObjectURL(b) : null)));
   }
+  // Passen die geladenen Bilder noch? Ausschnitt liegt darin und ein Bildpunkt ist feiner als ~500 m
+  // (das DWD-Radar hat 1 km Auflösung → Hineinzoomen um 1–2 Stufen bringt keine neuen Informationen)
+  function radarGenFits() {
+    const g = radar.gen;
+    if (!g || !radar.map) return false;
+    if (!g.bounds.contains(radar.map.getBounds())) return false;
+    const a = L.CRS.EPSG3857.project(g.bounds.getSouthWest()), c = L.CRS.EPSG3857.project(g.bounds.getNorthEast());
+    const mpp = (c.x - a.x) / g.w * Math.cos(g.bounds.getCenter().lat * Math.PI / 180);
+    return mpp <= 500;
+  }
   function radarImages(force) {
     if (!radar.map || !radar.frames.length) return;
+    if (!force && radarGenFits()) return; // vorhandene Bilder reichen (z. B. nach Hineinzoomen)
     const view = radar.map.getBounds(), zoom = radar.map.getZoom();
     const bounds = view.pad(RADAR_PAD), sz = radar.map.getSize(), dpr = Math.min(1.5, devicePixelRatio || 1);
     const w = Math.round(sz.x * (1 + 2 * RADAR_PAD) * dpr), h = Math.round(sz.y * (1 + 2 * RADAR_PAD) * dpr);
-    const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, bounds, zoom, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
+    const gen = { id: (radar.gen ? radar.gen.id : 0) + 1, bounds, zoom, w, urls: radar.frames.map(t => radarUrl(t, bounds, w, h)), srcs: [] };
     const old = radar.gen;
     radar.gen = gen;
     if (old) old.srcs.forEach(u => u && u.startsWith('blob:') && URL.revokeObjectURL(u));
@@ -837,7 +848,12 @@
       await loadLeaflet();
       if (!radar.map) radarInitMap(); else { radar.map.invalidateSize(); radarBaseTiles(); }
       radar.idx = radar.nowIdx; // Öffnen beginnt immer mit „jetzt“
-      await radarRefresh(true);
+      if (radar.gen && Date.now() - radar.loadedAt < 5 * 60e3 && radarGenFits()) {
+        // Zu- und gleich wieder aufgeklappt: Bilder sind noch aktuell und passen → nichts nachladen
+        radar.idx = radar.nowIdx = radarNowIdx();
+        radarShow(radar.idx);
+        radarProgress(); // startet den Loop, wenn alles da ist
+      } else await radarRefresh(true);
       $('radarStatus').style.display = 'none';
     } catch (e) {
       $('radarStatus').textContent = 'Radar konnte nicht geladen werden (' + e.message + ').';
@@ -901,6 +917,7 @@
       }
     }
     $('updated').replaceChildren(...parts);
+    $('dataAge').textContent = 'Stand ' + state.fetchedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     $('curT').textContent = fmt1(d.current.temperature_2m) + ' °C';
     $('curH').textContent = Math.round(d.current.relative_humidity_2m) + ' %';
     $('elev').textContent = d.elevation != null ? `(${Math.round(d.elevation).toLocaleString('de-DE')} m):` : ':';
@@ -1676,6 +1693,7 @@
       b.addEventListener('click', () => {
         if (state.editTabs) { state.favs.splice(i, 1); store.set('favs', state.favs); renderTabs(); }
         else if (locKey(f) !== cur || state.loc.gps) setLoc(f);
+        else refreshAll(); // aktiver Ort erneut angetippt → aktualisieren
       });
       tabs.push(b);
     });
@@ -1803,7 +1821,9 @@
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
   }
 
-  $('reload').addEventListener('click', () => { load(true); radarRefresh(true); }); // Knopf lädt auch Ensemble und Radar neu
+  // Wetterdaten neu laden (auch Statistik-Trend und – falls offen – Radar); ebenso erneutes Tippen auf den aktiven Ort
+  function refreshAll() { load(true); radarRefresh(true); }
+  $('reload').addEventListener('click', refreshAll);
 
   // ---------- Einstellungen ----------
   // Darstellung: automatisch / hell / dunkel; Browserleisten-Farbe passend setzen
