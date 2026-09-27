@@ -137,6 +137,7 @@
   .trend .band { width: 18px; height: 10px; border-radius: 2px; display: inline-block;
     background: linear-gradient(180deg, rgba(255,59,48,.18), rgba(0,122,255,.18)); }
   .trend .chart svg { cursor: default; }
+  .no-trend-legend #trendBox .legend, .no-trend-legend #ensBox .legend { display: none; }
   .trend .legend {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 16px;
     font-size: 12px; color: var(--muted); padding: 6px 4px 2px;
@@ -150,8 +151,14 @@
   .radarmap { position: relative; height: min(62vh, 380px); border-radius: 10px; overflow: hidden; background: var(--cell); }
   #radarMap { position: absolute; inset: 0; }
   .radarmap .status { z-index: 500; pointer-events: none; }
+  .rinfo { position: absolute; left: 8px; bottom: 8px; z-index: 600; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+  .rhint {
+    position: absolute; inset: 0; z-index: 650; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 15px; font-weight: 600; pointer-events: none;
+  }
+  .rhint[hidden] { display: none; }
   .rspin {
-    position: absolute; top: 8px; right: 8px; z-index: 600; display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     background: var(--card); color: var(--muted); border-radius: 12px; padding: 3px 8px 3px 5px;
     font-size: 11px; font-variant-numeric: tabular-nums; box-shadow: 0 1px 4px rgba(0,0,0,.2); pointer-events: none;
   }
@@ -163,7 +170,6 @@
   @keyframes rspin { to { transform: rotate(360deg); } }
   /* Zeitstempel auf der Karte; das „jetzt“-Bild ist blau hervorgehoben */
   .rstamp {
-    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 600; pointer-events: none;
     background: rgba(28,28,30,.72); color: #fff; border-radius: 12px; padding: 3px 10px;
     font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
   }
@@ -180,14 +186,10 @@
   .radarctl .nowmark::before {
     content: ""; position: absolute; left: 50%; top: -7px; width: 1.5px; height: 6px; background: var(--muted);
   }
-  .radarctl .rtime { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 128px; text-align: right; }
-  .radarctl .rtime b { color: var(--text); font-weight: 600; }
-  .radarctl .rload { color: var(--muted); font-style: italic; }
   .rscale { gap: 4px 10px; font-size: 11px; }
   .rscale i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   #radarMap.leaflet-container { font: inherit; background: var(--cell); } /* stärker als leaflet.css */
   .leaflet-control-attribution { font-size: 9px; }
-  #radarMap.dark .basemap { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.85); }
   .nowbtn {
     position: absolute; left: 32px; top: 0; padding: 1px 7px; font-size: 10px; line-height: 14px; border-radius: 7px;
   }
@@ -229,6 +231,15 @@
   .tab.gpsTab { padding: 5px 9px; color: var(--accent); }
   .tab.gpsTab.active { color: #fff; }
   .tab.gpsTab svg { width: 20px; height: 20px; display: block; }
+  .searchbar { padding: 0 0 10px; }
+  .searchbar[hidden] { display: none; }
+  /* Stundengrafik immer dunkel (unabhängig von Hell/Dunkel) */
+  .widget.hourly {
+    --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --border: #38383a; --input: #2c2c2e;
+    color-scheme: dark; background: var(--card); color: var(--text); position: relative;
+  }
+  .widget.hourly .head { padding-right: 46px; }
+  .hbtn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; z-index: 2; }
   .tab.edit.on { background: var(--accent); color: #fff; }
   .settings {
     background: var(--input); border: 1px solid var(--border); border-radius: 10px;
@@ -273,6 +284,7 @@
     .tab { padding: 6px 11px; font-size: 15px; }
     .controls { margin-top: 10px; gap: 10px; }
     .controls .row { padding: 0 10px; }
+    .searchbar { padding: 0 10px 8px; }
     .note { padding: 0 12px; }
     button, input[type=search] { font-size: 16px; } /* verhindert Auto-Zoom in iOS Safari */
   }
@@ -306,6 +318,8 @@
   .help h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 4px; }
   .help .ex-row { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); }
   .help .ex-row p, .help p.plain { margin: 0; }
+  .help .plist { margin: 6px 0 0; padding-left: 18px; }
+  .help .plist li { margin: 3px 0; }
   .help .ex { color: var(--text); }
   .help .ex svg { width: 84px; height: 32px; display: block; border-radius: 4px; }
   .help .ex-text { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -318,7 +332,16 @@
 <body>
 <main>
   <nav class="tabs" id="tabs" aria-label="Gespeicherte Orte"></nav>
-  <section class="widget" aria-label="Wetter-Widget">
+  <div class="searchbar" id="searchBar" hidden>
+    <div class="search">
+      <input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" aria-label="Ort suchen">
+      <ul class="results" id="results" role="listbox"></ul>
+    </div>
+  </div>
+  <section class="widget hourly" aria-label="Wetter-Widget">
+    <button id="reload" class="icon hbtn" title="Aktualisieren" aria-label="Aktualisieren">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <div class="head">
       <div class="line1">
         <span class="name" id="name">–</span><span class="elev" id="elev"></span>
@@ -334,25 +357,17 @@
     </div>
   </section>
 
-  <section class="controls">
-    <div class="row">
-      <div class="search">
-        <input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" aria-label="Ort suchen">
-        <ul class="results" id="results" role="listbox"></ul>
-      </div>
-      <button id="reload" class="icon" title="Aktualisieren" aria-label="Aktualisieren">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </div>
-  </section>
 
   <details class="widget trend radar" id="radarBox" aria-label="Regenradar">
     <summary><h2>Regenradar <small>(DWD · −2 h bis +2 h)</small></h2></summary>
     <div class="radarmap">
       <div id="radarMap"></div>
       <div class="status" id="radarStatus">Lade Radar …</div>
-      <div class="rspin" id="radarSpin" hidden title="Radarbilder werden geladen"><i></i><span id="radarSpinTxt"></span></div>
-      <div class="rstamp" id="radarStamp" hidden></div>
+      <div class="rinfo">
+        <div class="rspin" id="radarSpin" hidden title="Radarbilder werden geladen"><i></i><span id="radarSpinTxt"></span></div>
+        <div class="rstamp" id="radarStamp" hidden></div>
+      </div>
+      <div class="rhint" id="radarHint" hidden>Zum Verschieben zwei Finger verwenden</div>
     </div>
     <div class="radarctl">
       <button id="radarPlay" class="icon" type="button" aria-label="Abspielen">
@@ -362,7 +377,6 @@
         <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
         <button type="button" class="nowmark" id="radarNowMark" title="Zur aktuellen Zeit">jetzt</button>
       </div>
-      <span class="rtime" id="radarTime">–</span>
     </div>
     <div class="legend rscale">
       <span>mm/h</span>
@@ -388,8 +402,8 @@
     </div>
   </details>
 
-  <details class="widget trend" id="ensBox" aria-label="14-Tage-Trend Ensemble-Mittel">
-    <summary><h2>14-Tage-Trend · Ensemble-Mittel <small>(ECMWF, 51 Läufe)</small></h2></summary>
+  <details class="widget trend" id="ensBox" aria-label="14-Tage-Trend Durchschnitt vieler Prognosen">
+    <summary><h2>14-Tage-Trend · Durchschnitt vieler Prognosen <small>(51 Rechnungen, ECMWF)</small></h2></summary>
     <div class="chart" id="ensChart">
       <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
       <div class="tip" id="ensTip"></div>
@@ -414,6 +428,7 @@
         <label><input type="checkbox" data-opt="clouds"> Wolken</label>
         <label><input type="checkbox" data-opt="windbar"> Wind-Leiste</label>
         <label><input type="checkbox" data-opt="symbols"> Wettersymbole</label>
+        <label><input type="checkbox" data-opt="trendLegend"> Legende bei den 14-Tage-Trends</label>
         <label class="sel">Wind in
           <select id="windUnit">
             <option value="kmh">km/h</option><option value="ms">m/s</option>
@@ -472,16 +487,42 @@
 
       <h3>Regenradar</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect width="72" height="28" fill="#e9ecef"/><path d="M8 20 C14 6 30 4 38 10 S52 26 64 16" fill="none" stroke="#4db31b" stroke-width="7" stroke-linecap="round"/><circle cx="36" cy="10" r="3" fill="#ffff01"/><circle cx="36" cy="10" r="1.5" fill="#ff8901"/><circle cx="20" cy="18" r="3" fill="#007aff" stroke="#fff"/></svg></div>
-        <p>Radarbild des Deutschen Wetterdienstes: die letzten 2 Stunden gemessen, danach bis etwa 2 Stunden <b>Vorhersage</b>, alle 5 Minuten ein Bild; offen wird es alle 5 Minuten aktualisiert. Beim Öffnen läuft der Film automatisch los, sobald alle Bilder geladen sind (Rädchen oben rechts); auf dem aktuellen Bild – blau markiert „jetzt“ – bleibt er kurz stehen. ⏸ hält an, mit dem Regler wählst du einen Zeitpunkt. Farben: <span style="color:#019934">grün</span> leichter Regen, <b>gelb/orange</b> kräftig, <span style="color:#fe0000">rot/violett</span> Starkregen oder Gewitter. Grau = außerhalb der deutschen Radarabdeckung. Die Karte wird erst beim Aufklappen geladen.</p></div>
+        <p>Radarbild des Deutschen Wetterdienstes: die letzten 2 Stunden gemessen, danach bis etwa 2 Stunden <b>Vorhersage</b>, alle 5 Minuten ein Bild; offen wird es alle 5 Minuten aktualisiert. Beim Öffnen läuft der Film automatisch los, sobald alle Bilder geladen sind (Rädchen oben rechts); auf dem aktuellen Bild – blau markiert „jetzt“ – bleibt er kurz stehen. ⏸ hält an, mit dem Regler wählst du einen Zeitpunkt. Farben: <span style="color:#019934">grün</span> leichter Regen, <b>gelb/orange</b> kräftig, <span style="color:#fe0000">rot/violett</span> Starkregen oder Gewitter. Grau = außerhalb der deutschen Radarabdeckung. Die Karte wird erst beim Aufklappen geladen. Auf dem Handy verschiebst du sie mit zwei Fingern (ein Finger scrollt die Seite).</p></div>
 
       <h3>14-Tage-Trends</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="0" width="24" height="22" fill="rgba(90,130,190,.12)"/><circle cx="12" cy="6" r="2.5" fill="#ff3b30"/><circle cx="36" cy="4" r="2.5" fill="#ff3b30"/><circle cx="60" cy="9" r="2.5" fill="#ff3b30"/><circle cx="12" cy="17" r="2.5" fill="#007aff"/><circle cx="36" cy="15" r="2.5" fill="#007aff"/><circle cx="60" cy="19" r="2.5" fill="#007aff"/><rect x="0" y="23" width="23" height="5" fill="rgba(252,242,40,1)"/><rect x="24" y="23" width="23" height="5" fill="rgba(252,242,40,.3)"/><rect x="48" y="23" width="24" height="5" fill="#ececec"/></svg></div>
         <p>Pro Tag <span style="color:var(--warm)">Höchst-</span> und <span style="color:var(--cold)">Tiefstwert</span>, das Wochenende ist hinterlegt. Die Zeile darunter: <b>kräftig gelb</b> = fast den ganzen Tag Sonne, blass = etwas Sonne, grau = trüb. Dünne Balken = Regen bzw. Schnee des Tages.</p></div>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><path d="M2 12 C20 10 30 6 36 8 S56 4 70 2 L70 20 C56 18 44 18 36 16 S20 14 2 13Z" fill="rgba(255,59,48,.15)"/><path d="M2 12.5 C20 12 30 11 36 12 S56 11 70 11" fill="none" stroke="#c3cdd6" stroke-width="1.5"/><circle cx="36" cy="12" r="2.5" fill="#ff3b30"/></svg></div>
-        <p><b>Einzellauf</b> (oben): eine Modellrechnung – genau, aber in der zweiten Woche oft sprunghaft. <b>Ensemble-Mittel</b>: Durchschnitt aus 51 leicht unterschiedlichen Rechnungen – ruhiger. Die Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Je breiter die Fläche, desto unsicherer.</p></div>
+        <p>Warum zwei Trends? Das Wetter reagiert empfindlich auf kleinste Unterschiede am Anfang – wie eine Kugel auf einem Hügel, die je nach winzigem Schubs in ein anderes Tal rollt.</p></div>
+      <div class="ex-row"><div class="ex ex-text">1 Prognose</div>
+        <p><b>14-Tage-Trend</b> (oben): <b>eine</b> Rechnung eines Wettermodells. In den ersten Tagen am genauesten, in der zweiten Woche aber oft sprunghaft – ein einzelner Regentag kann dort genauso gut einen Tag früher oder später kommen.</p></div>
+      <div class="ex-row"><div class="ex ex-text">51 Prognosen</div>
+        <p><b>Durchschnitt vieler Prognosen</b>: Der Wetterdienst rechnet dieselbe Vorhersage 51-mal, jedes Mal mit minimal veränderten Startwerten. Die Punkte sind der Durchschnitt – ruhiger und für die zweite Woche meist verlässlicher. Die farbige Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Schmal = die Rechnungen sind sich einig, breit = unsicher.</p></div>
 
       <h3>Gut zu wissen</h3>
       <p class="plain">Alle Werte sind Modellvorhersagen für den gewählten Punkt, keine Messwerte. Nachts kann es in Senken einige Grad kälter sein als angezeigt. Die Seite lädt stündlich neu (das Ensemble alle 12 Stunden), der ↻-Knopf sofort. Orte, Einstellungen und Aufklapp-Zustände werden nur in diesem Browser gespeichert.</p>
+    </div>
+  </details>
+  </section>
+
+  <section class="controls">
+  <details class="settings help" id="privacy">
+    <summary>🛡︎ Datenschutz · Haftungsausschluss</summary>
+    <div class="helpbody">
+      <h3>Datenschutz</h3>
+      <p class="plain">Diese Seite ist ein privates, nicht-kommerzielles Projekt. Sie setzt <b>keine Cookies</b>, nutzt <b>keine Analyse- oder Werbedienste</b> und hat kein Benutzerkonto.</p>
+      <p class="plain" style="margin-top:8px">Gespeicherte Orte, Einstellungen und Zwischenstände (z. B. der Durchschnitt vieler Prognosen) liegen nur <b>lokal in deinem Browser</b> (localStorage) und werden nicht übertragen. Löschen: Browser-Daten dieser Seite entfernen.</p>
+      <p class="plain" style="margin-top:8px">Um Wetterdaten anzuzeigen, ruft dein Browser <b>direkt</b> folgende Dienste auf. Dabei sehen diese – wie bei jedem Webseitenaufruf – deine IP-Adresse und die Koordinaten des gewählten Orts:</p>
+      <ul class="plist">
+        <li><b>Open-Meteo</b> (Schweiz) – Vorhersage, Tide, Ortssuche (Suchbegriff)</li>
+        <li><b>Deutscher Wetterdienst</b> – Radarbilder (nur wenn das Regenradar geöffnet ist)</li>
+        <li><b>BKG / basemap.de</b> – Grundkarte des Radars</li>
+        <li><b>cdnjs (Cloudflare)</b> – Kartenbibliothek Leaflet (beim Öffnen des Radars)</li>
+        <li><b>BigDataCloud</b> – Ortsname zu deinem Standort, nur wenn du auf ⌖ tippst; der Standort selbst wird nur nach deiner Freigabe im Browser ermittelt</li>
+        <li><b>GitHub Pages</b> – stellt die Seite bereit (übliche Server-Protokolle)</li>
+      </ul>
+      <h3>Haftungsausschluss</h3>
+      <p class="plain">Alle Angaben sind automatisch erzeugte <b>Modellvorhersagen ohne Gewähr</b> auf Richtigkeit, Vollständigkeit oder Aktualität. Sie ersetzen keine amtlichen Warnungen (z. B. des Deutschen Wetterdienstes) und sind nicht für sicherheitsrelevante Entscheidungen gedacht. Tidenangaben sind <b>nicht für Navigation oder Wattwanderungen</b> geeignet. Für Schäden, die aus der Nutzung entstehen, wird keine Haftung übernommen. Für Inhalte der eingebundenen Dienste sind deren Betreiber verantwortlich.</p>
     </div>
   </details>
   </section>
@@ -514,7 +555,7 @@
     ens: null,  // 14-Tage-Ensemble (Mittelwerte), alle 6 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
-    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true,
+    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
       windUnit: 'kmh', start: 'last', theme: 'auto' }, store.get('opts') || {}),
   };
 
@@ -637,13 +678,29 @@
 
   function radarInitMap() {
     const { lat, lon } = state.loc;
-    radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11, inertia: false,
+    const touch = matchMedia('(pointer: coarse)').matches;
+    radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11, inertia: false, dragging: !touch,
       maxBounds: [[44.5, 1.5], [57.5, 19.5]], maxBoundsViscosity: 0.9 }).setView([lat, lon], 8); // nur Radargebiet
     radar.map.createPane('radar').style.zIndex = 350;
     const names = radar.map.createPane('names'); names.style.zIndex = 450; names.style.pointerEvents = 'none'; // für die Ortsmarke
     radarBaseTiles();
     radar.marker = L.circleMarker([lat, lon], { radius: 6, weight: 2, color: '#fff', fillColor: css('--accent'), fillOpacity: 1, pane: 'names' }).addTo(radar.map);
     let t; radar.map.on('moveend', () => { clearTimeout(t); t = setTimeout(radarImages, 250); });
+    // Touch: ein Finger scrollt die Seite, zwei Finger verschieben/zoomen die Karte (Hinweis bei einem Finger)
+    if (touch) {
+      const box = $('radarMap'); let hintT, moved = false;
+      box.addEventListener('touchstart', e => {
+        moved = false;
+        if (e.touches.length >= 2) { radar.map.dragging.enable(); $('radarHint').hidden = true; }
+      }, { passive: true });
+      box.addEventListener('touchmove', e => {
+        if (e.touches.length === 1 && !moved) {
+          moved = true; $('radarHint').hidden = false;
+          clearTimeout(hintT); hintT = setTimeout(() => { $('radarHint').hidden = true; }, 1200);
+        }
+      }, { passive: true });
+      box.addEventListener('touchend', e => { if (e.touches.length < 2) radar.map.dragging.disable(); }, { passive: true });
+    }
   }
 
   // Zeitpunkte: 2 h zurück bis zum letzten Vorhersage-Zeitpunkt laut DWD (ca. +2 h)
@@ -740,10 +797,8 @@
     const stamp = $('radarStamp');
     stamp.hidden = false;
     stamp.className = 'rstamp' + (i === radar.nowIdx ? ' now' : i > radar.nowIdx ? ' fc' : '');
-    stamp.textContent = hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`);
-    $('radarTime').innerHTML = `<b>${hhmm(t / 1000, off)}</b> · `
-      + (i === radar.nowIdx ? 'jetzt' : i > radar.nowIdx ? `Vorhersage +${d} min` : `vor ${-d} min`)
-      + (!st ? ' <span class="rload">· lädt …</span>' : st === 'fehler' ? ' <span class="rload">· keine Daten</span>' : '');
+    stamp.textContent = hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`)
+      + (!st ? ' · lädt …' : st === 'fehler' ? ' · keine Daten' : '');
   }
   // Ladefortschritt der Bilder dezent am Regler anzeigen
   function radarProgress() {
@@ -752,7 +807,7 @@
     $('radarSlider').style.opacity = all ? 1 : .55 + .45 * n / g.urls.length;
     $('radarSpin').hidden = all;
     $('radarSpinTxt').textContent = all ? '' : `${n}/${g.urls.length}`;
-    if (all && radar.autoplay) { radar.autoplay = false; radarPlay(true); } // beim Öffnen: Loop starten
+    if (all && radar.autoplay) { radar.autoplay = false; radarShow(radar.nowIdx); radarPlay(true); } // beim Öffnen: Loop ab „jetzt“
   }
   // „jetzt“ unter dem Regler an die Position des aktuellen Zeitpunkts setzen (Daumen ≈ 16 px breit)
   function radarNowMark() {
@@ -764,15 +819,15 @@
     radar.playing = on;
     $('radarPlayIcon').setAttribute('d', on ? 'M7 5h4v14H7zM13 5h4v14h-4z' : 'M8 5v14l11-7z');
     $('radarPlay').setAttribute('aria-label', on ? 'Pause' : 'Abspielen');
-    if (on) radarStep();
+    if (on) radar.timer = setTimeout(radarStep, radarDelay(radar.idx)); // aktuelles Bild erst stehen lassen
   }
+  const radarDelay = i => i === radar.nowIdx ? 1500 : i === radar.frames.length - 1 ? 1200 : 400;
   // ein Bild weiter (nur wenn geladen); auf „jetzt“ 1,5 s und am Ende 1,2 s verweilen
   function radarStep() {
     if (!radar.playing) return;
     const n = radar.frames.length, next = (radar.idx + 1) % n;
     if (radar.gen && radar.gen.srcs[next]) radarShow(next);
-    const delay = radar.idx === radar.nowIdx ? 1500 : radar.idx === n - 1 ? 1200 : 400;
-    radar.timer = setTimeout(radarStep, delay);
+    radar.timer = setTimeout(radarStep, radarDelay(radar.idx));
   }
 
   async function radarOpen() {
@@ -781,6 +836,7 @@
     try {
       await loadLeaflet();
       if (!radar.map) radarInitMap(); else { radar.map.invalidateSize(); radarBaseTiles(); }
+      radar.idx = radar.nowIdx; // Öffnen beginnt immer mit „jetzt“
       await radarRefresh(true);
       $('radarStatus').style.display = 'none';
     } catch (e) {
@@ -1469,6 +1525,7 @@
   function updateNowBtn() { $('nowBtn').hidden = state.offset === 0; }
 
   function render() {
+    document.body.classList.toggle('no-trend-legend', !state.opts.trendLegend);
     if (!state.data) return;
     renderHeader();
     renderChart();
@@ -1602,7 +1659,13 @@
     gpsTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/>'
       + '<circle cx="12" cy="12" r="2.3" fill="currentColor"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     gpsTab.addEventListener('click', locate);
-    const tabs = [gpsTab];
+    const find = mk('', $('searchBar').hidden === false, 'Ort suchen');
+    find.classList.add('gpsTab');
+    find.setAttribute('aria-label', 'Ort suchen');
+    find.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/>'
+      + '<path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+    find.addEventListener('click', () => toggleSearch());
+    const tabs = [find, gpsTab];
     state.favs.forEach((f, i) => {
       const b = mk(f.name, !state.loc.gps && locKey(f) === cur, [f.name, f.region].filter(Boolean).join(', '));
       if (state.editTabs) {
@@ -1626,8 +1689,11 @@
       });
       tabs.push(add);
     }
-    const ed = mk('✎', false, state.editTabs ? 'Fertig' : 'Orte bearbeiten');
-    ed.classList.add('edit');
+    const ed = mk('', false, state.editTabs ? 'Fertig' : 'Orte bearbeiten');
+    ed.classList.add('edit', 'gpsTab');
+    ed.setAttribute('aria-label', state.editTabs ? 'Fertig' : 'Orte bearbeiten');
+    ed.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>'
+      + '<path d="M13.5 7l3.5 3.5" stroke="currentColor" stroke-width="2.4"/></svg>';
     if (state.editTabs) ed.classList.add('on');
     ed.addEventListener('click', () => { state.editTabs = !state.editTabs; renderTabs(); });
     tabs.push(ed);
@@ -1642,6 +1708,14 @@
     const opts = [['last', 'Zuletzt gezeigten Ort'], ['gps', 'Aktuellen Standort'], ...state.favs.map(f => [locKey(f), f.name])];
     sel.replaceChildren(...opts.map(([v, t]) => Object.assign(document.createElement('option'), { value: v, textContent: t })));
     sel.value = opts.some(([v]) => v === state.opts.start) ? state.opts.start : 'last';
+  }
+  // Ortssuche: Lupe in der Register-Leiste klappt das Suchfeld auf und zu
+  function toggleSearch(open) {
+    const bar = $('searchBar');
+    bar.hidden = open === undefined ? !bar.hidden : !open;
+    if (!bar.hidden) setTimeout(() => $('q').focus(), 30);
+    else { $('q').value = ''; $('results').replaceChildren(); }
+    renderTabs();
   }
   function addFav(loc) {
     if (!state.favs.some(f => locKey(f) === locKey(loc))) { state.favs.push(loc); store.set('favs', state.favs); }
@@ -1703,8 +1777,7 @@
   }
   function pick(g) {
     if (!g) return;
-    $('results').replaceChildren();
-    $('q').value = '';
+    toggleSearch(false);
     const loc = { name: g.name, region: [g.admin2, g.admin1].filter(Boolean).join(', '), lat: g.latitude, lon: g.longitude };
     setLoc(loc);
   }
@@ -1850,6 +1923,8 @@
   };
   setInterval(tick, 60 * 1000);
   document.addEventListener('visibilitychange', tick);
+  // Beim Wechsel in den Hintergrund Radar zuklappen (Karte, Zoom usw. bleiben erhalten)
+  document.addEventListener('visibilitychange', () => { if (document.hidden && $('radarBox').open) $('radarBox').open = false; });
 
   // Start-Ort anwenden
   const st = state.opts.start, startFav = state.favs.find(f => locKey(f) === st);
