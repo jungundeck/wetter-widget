@@ -149,7 +149,9 @@
     width: 60px; height: 12px; border-radius: 3px; display: inline-block;
     background: linear-gradient(90deg, rgb(var(--sun)), var(--cell));
   }
-  .rmode { display: flex; gap: 0; margin: 0 0 8px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; width: max-content; }
+  .rmode { display: inline-flex; gap: 0; margin-left: auto; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  details:not([open]) > summary > .rmode { display: none; } /* Umschalter nur bei aufgeklappter Karte */
+  details.radar[open] > summary::after { margin-left: 12px; }
   .rmode button { border: 0; border-radius: 0; padding: 5px 12px; font-size: 13px; background: var(--input); color: var(--text); }
   .rmode button[aria-pressed=true] { background: var(--accent); color: #fff; }
   .radarmap { position: relative; height: min(62vh, 380px); border-radius: 10px; overflow: hidden; background: var(--cell); }
@@ -298,7 +300,6 @@
     .trend .legend { padding: 6px 8px 2px; }
     .radarmap { border-radius: 0; }
     .radarctl { padding: 8px 10px 0; }
-    .rmode { margin-left: 10px; }
     .head { padding: 0 8px 6px; }
     .head .line1 { font-size: 16px; }
     .tabs { padding: 0 10px 8px; margin: 0; }
@@ -377,11 +378,12 @@
 
 
   <details class="widget trend radar" id="radarBox" aria-label="Regenradar">
-    <summary><h2>Regenradar <small id="radarSub">(DWD · −2 h bis +2 h)</small></h2></summary>
-    <div class="rmode" role="group" aria-label="Ansicht">
-      <button type="button" data-mode="radar" aria-pressed="true">Radar ±2 h</button>
-      <button type="button" data-mode="model" aria-pressed="false">Modell 48 h</button>
-    </div>
+    <summary><h2>Regenradar</h2>
+      <span class="rmode" role="group" aria-label="Ansicht">
+        <button type="button" data-mode="radar" aria-pressed="true">Radar ±2 h</button>
+        <button type="button" data-mode="model" aria-pressed="false">Modell 48 h</button>
+      </span>
+    </summary>
     <div class="radarmap">
       <div id="radarMap"></div>
       <div class="status" id="radarStatus">Lade Radar …</div>
@@ -409,7 +411,7 @@
       <span><i style="background:#ffff01"></i>5</span><span><i style="background:#ff8901"></i>10</span>
       <span><i style="background:#fe0000"></i>30</span><span><i style="background:#cc0098"></i>75+</span>
       <span id="radarNoData"><i style="background:rgba(128,128,128,.35)"></i>keine Daten</span>
-      <span id="radarModelNote" hidden>Modell: Stundensumme, ICON-EU (ca. 7 km)</span>
+      <span id="radarModelNote" hidden>Modell: Stundensumme, ICON-EU des DWD (ca. 7 km)</span>
     </div>
   </details>
 
@@ -428,7 +430,7 @@
   </details>
 
   <details class="widget trend" id="ensBox" aria-label="14-Tage-Trend Statistik">
-    <summary><h2>14-Tage-Trend · Statistik <small>(Durchschnitt aus 51 Prognosen, ECMWF)</small></h2></summary>
+    <summary><h2>14-Tage-Trend · Statistik</h2></summary>
     <div class="chart" id="ensChart">
       <svg id="ensSvg" role="img" aria-label="Mittel aus 51 Modellläufen: Höchst- und Tiefsttemperaturen, Niederschlag und Sonnenschein der nächsten 14 Tage"></svg>
       <div class="tip" id="ensTip"></div>
@@ -440,6 +442,7 @@
       <span><i class="band"></i>80% CI</span>
       <span>☀︎ viel <i class="sunbar"></i> wenig</span>
       <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
+      <span>Durchschnitt aus 51 Prognosen des ECMWF</span>
     </div>
   </details>
 
@@ -874,7 +877,7 @@
     stamp.hidden = false;
     stamp.className = 'rstamp' + (i === radar.nowIdx ? ' now' : i > radar.nowIdx ? ' fc' : '');
     stamp.textContent = (isModel()
-        ? `${locHour(t / 1000 - H)} Uhr` + (i === 0 ? ' · jetzt' : ` · +${i} Std.`)
+        ? `${locWeekday(t / 1000 - H)} ${locHour(t / 1000 - H)} Uhr` + (i === 0 ? ' · jetzt' : ` · +${i} Std.`)
         : hhmm(t / 1000, off) + (i === radar.nowIdx ? ' · jetzt' : i > radar.nowIdx ? ` · +${d} min` : ` · −${-d} min`))
       + (!st ? ' · lädt …' : st === 'fehler' ? ' · keine Daten' : '');
   }
@@ -899,11 +902,16 @@
     const n = radar.frames.length - 1, spans = [];
     const px = Math.max(1, ($('radarSlider').clientWidth || 300) - 16) / Math.max(1, n); // Pixel je Stunde
     let lastPx = -99, pendingDay = '';
+    const mk = (i, txt, cls) => { const e = document.createElement('span'); e.textContent = txt; if (cls) e.className = cls; e.style.left = sliderPos(i, n); spans.push(e); };
     const add = (i, txt, cls) => {
-      if (i * px - lastPx < 26) { if (cls === 'day' && i) pendingDay = txt; return; } // zu dicht: Tag merken
+      if (i * px - lastPx < 26) { // zu dicht für Text: nur den Strich zeigen, Tag zur nächsten Marke mitnehmen
+        if (i) mk(i, '', cls);
+        if (cls === 'day' && i) pendingDay = txt;
+        return;
+      }
       if (pendingDay) { txt = pendingDay + ' ' + txt; cls = 'day'; pendingDay = ''; } // „Mo 6“
       lastPx = i * px;
-      const e = document.createElement('span'); e.textContent = txt; if (cls) e.className = cls; e.style.left = sliderPos(i, n); spans.push(e);
+      mk(i, txt, cls);
     };
     add(0, 'Jetzt', 'day');
     radar.frames.forEach((t, i) => {
@@ -976,7 +984,6 @@
     if (radar.mode === mode) return;
     radar.mode = mode;
     document.querySelectorAll('.rmode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
-    $('radarSub').textContent = mode === 'model' ? '(DWD-Modell ICON-EU · nächste 48 h)' : '(DWD · −2 h bis +2 h)';
     $('radarModelNote').hidden = mode !== 'model';
     $('radarNoData').hidden = mode === 'model';
     radarAreaNote();
@@ -2043,7 +2050,8 @@
     if ($('radarBox').open) { radar.autoplay = true; radarOpen(); } else { radar.autoplay = false; radarPlay(false); }
   });
   $('radarPlay').addEventListener('click', () => { radar.autoplay = false; radarPlay(!radar.playing); });
-  document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', () => radarSetMode(b.dataset.mode)));
+  // Umschalter sitzt in der Kopfzeile: Klick darf die Karte nicht zuklappen
+  document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); radarSetMode(b.dataset.mode); }));
   $('radarSlider').addEventListener('input', e => { radar.autoplay = false; radarPlay(false); radarShow(+e.target.value); });
   $('radarNowMark').addEventListener('click', () => { radar.autoplay = false; radarPlay(false); radarShow(radar.nowIdx); });
 
