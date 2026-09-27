@@ -442,7 +442,8 @@
       <span><i class="band"></i>80% CI</span>
       <span>☀︎ viel <i class="sunbar"></i> wenig</span>
       <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
-      <span>Durchschnitt aus 51 Prognosen des ECMWF</span>
+      <span><b style="color:#0a5fc8">40%</b> Regenwahrscheinlichkeit (≥ 1 mm)</span>
+      <span>Median aus 51 Prognosen des ECMWF</span>
     </div>
   </details>
 
@@ -533,7 +534,7 @@
       <div class="ex-row"><div class="ex ex-text">1 Prognose</div>
         <p><b>14-Tage-Trend</b> (oben): <b>eine</b> Rechnung eines Wettermodells. In den ersten Tagen am genauesten, in der zweiten Woche aber oft sprunghaft – ein einzelner Regentag kann dort genauso gut einen Tag früher oder später kommen.</p></div>
       <div class="ex-row"><div class="ex ex-text">51 Prognosen</div>
-        <p><b>14-Tage-Trend · Statistik</b>: Der Wetterdienst rechnet dieselbe Vorhersage 51-mal, jedes Mal mit minimal veränderten Startwerten. Die Punkte sind der Durchschnitt – ruhiger und für die zweite Woche meist verlässlicher. Die farbige Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Schmal = die Rechnungen sind sich einig, breit = unsicher.</p></div>
+        <p><b>14-Tage-Trend · Statistik</b>: Der Wetterdienst rechnet dieselbe Vorhersage 51-mal, jedes Mal mit minimal veränderten Startwerten. Die Punkte sind die <b>mittlere Prognose (Median)</b>: die Hälfte der Rechnungen liegt darüber, die Hälfte darunter – ruhiger und für die zweite Woche meist verlässlicher. Die farbige Fläche („80% CI“) zeigt, wo 80 % der Rechnungen liegen: <b>18 (15–21)</b> heißt „wahrscheinlich 18 °C, eher nicht unter 15 oder über 21“. Schmal = die Rechnungen sind sich einig, breit = unsicher. Die blaue Prozentzahl ist der Anteil der Rechnungen mit mindestens 1 mm Regen – die <b>Regenwahrscheinlichkeit</b>. Sonnenschein ist der Erwartungswert (Mittel aller Rechnungen).</p></div>
 
       <h3>Gut zu wissen</h3>
       <p class="plain">Alle Werte sind Modellvorhersagen für den gewählten Punkt, keine Messwerte. Nachts kann es in Senken einige Grad kälter sein als angezeigt. Die Seite lädt stündlich neu (die Statistik alle 12 Stunden). Sofort aktualisieren: den aktiven Ort oben noch einmal antippen oder Einstellungen → Wetterdaten aktualisieren. Orte, Einstellungen und Aufklapp-Zustände werden nur in diesem Browser gespeichert.</p>
@@ -647,7 +648,7 @@
   async function loadEns(force) {
     if (!$('ensBox').open) return; // zugeklappt: nichts abrufen, erst beim Aufklappen
     const key = tideKey(state.loc), cached = store.get('ens');
-    if (!force && cached && cached.key === key && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
+    if (!force && cached && cached.key === key && cached.series && cached.series.rainP && Date.now() - cached.at < ENS_MAX_AGE) { state.ens = cached.series; renderEns(); return; }
     const { lat, lon } = state.loc;
     const url = 'https://ensemble-api.open-meteo.com/v1/ensemble'
       + `?latitude=${lat}&longitude=${lon}&models=ecmwf_ifs025`
@@ -666,12 +667,13 @@
       const mx = runs('temperature_2m_max'), mn = runs('temperature_2m_min'), rr = runs('precipitation_sum'), su = runs('sunshine_duration'), sn = runs('snowfall_sum');
       state.ens = {
         time: dl.time,
-        max: mx.map(mean), min: mn.map(mean),
+        max: mx.map(a => q(a, .5)), min: mn.map(a => q(a, .5)), // Median, wie in den ECMWF-Meteogrammen (passt zu den Perzentil-Flächen)
         maxLo: mx.map(a => q(a, .1)), maxHi: mx.map(a => q(a, .9)),
         minLo: mn.map(a => q(a, .1)), minHi: mn.map(a => q(a, .9)),
         rain: rr.map(a => q(a, .5)),      // Median: Mittelwerte würden Regen über alle Tage verschmieren
         snow: sn.map(a => q(a, .5)),      // Schnee in cm (Median)
-        sun: su.map(mean),
+        rainP: rr.map(a => a.length ? a.filter(x => x >= 1).length / a.length : 0), // Anteil der Rechnungen mit ≥ 1 mm
+        sun: su.map(mean),               // Erwartungswert der Sonnenstunden
       };
       store.set('ens', { key, at: Date.now(), series: state.ens });
       renderEns();
@@ -1754,6 +1756,11 @@
       const sunFrac = Math.min(1, (ser.sun[j] || 0) / daylight(ser.time[j]));
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: css('--cell') }, svg);
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${(sunFrac * sunFrac).toFixed(2)})` }, svg); // quadratisch: nur wirklich sonnige Tage kräftig gelb
+      // Regenwahrscheinlichkeit (Statistik): „40%“ in der Zeile, ab 10 %
+      if (ser.rainP && ser.rainP[j] >= 0.1) {
+        const pt = el('text', { x: cx(j), y: y0 + CELL / 2 + 3.5, 'text-anchor': 'middle', 'font-size': small ? 9 : 10, 'font-weight': 600, fill: '#0a5fc8' }, svg);
+        pt.textContent = Math.round(ser.rainP[j] * 10) * 10 + '%';
+      }
     }
     trendViews[id] = { n, cw, W, ser, daylight };
   }
@@ -1783,7 +1790,7 @@
     const tip = $(id + 'Tip');
     tip.innerHTML = `<b>${date}</b> · <span style="color:var(--warm)">${fmt1(ser.max[j])}°</span>${range(ser.maxLo, ser.maxHi)} / `
       + `<span style="color:var(--cold)">${fmt1(ser.min[j])}°</span>${range(ser.minLo, ser.minHi)}`
-      + ` · 💧 ${fmt1(ser.rain[j] || 0)} mm`
+      + ` · 💧 ${fmt1(ser.rain[j] || 0)} mm` + (ser.rainP ? ` (Regen ≥ 1 mm: ${Math.round(ser.rainP[j] * 100)} %)` : '')
       + (ser.snow && ser.snow[j] > 0 ? ` · <span style="color:var(--snow-strong)">❄︎ ${fmt1(ser.snow[j])} cm</span>` : '')
       + ` · ☀︎ ${fmt1((ser.sun[j] || 0) / 3600)} h von ${fmt1(v.daylight(ser.time[j]) / 3600)} h`;
     tip.style.display = 'block';
