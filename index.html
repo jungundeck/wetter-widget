@@ -147,6 +147,19 @@
     width: 60px; height: 12px; border-radius: 3px; display: inline-block;
     background: linear-gradient(90deg, rgb(var(--sun)), var(--cell));
   }
+  .radarmap { position: relative; height: min(62vh, 380px); border-radius: 10px; overflow: hidden; background: var(--cell); }
+  #radarMap { position: absolute; inset: 0; }
+  .radarmap .status { z-index: 500; pointer-events: none; }
+  .radarctl { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; }
+  .radarctl button.icon { width: 38px; height: 38px; }
+  .radarctl input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .radarctl .rtime { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 128px; text-align: right; }
+  .radarctl .rtime b { color: var(--text); font-weight: 600; }
+  .rscale { gap: 4px 10px; font-size: 11px; }
+  .rscale i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  #radarMap.leaflet-container { font: inherit; background: var(--cell); } /* stärker als leaflet.css */
+  .leaflet-control-attribution { font-size: 9px; }
+  #radarMap.dark .basemap { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.85); }
   .nowbtn {
     position: absolute; left: 32px; top: 0; padding: 1px 7px; font-size: 10px; line-height: 14px; border-radius: 7px;
   }
@@ -224,6 +237,8 @@
     .trend { margin-top: 10px; }
     .trend summary { padding: 0 10px; }
     .trend .legend { padding: 6px 8px 2px; }
+    .radarmap { border-radius: 0; }
+    .radarctl { padding: 8px 10px 0; }
     .head { padding: 0 8px 6px; }
     .head .line1 { font-size: 16px; }
     .tabs { padding: 0 10px 8px; margin: 0; }
@@ -302,6 +317,29 @@
       </button>
     </div>
   </section>
+
+  <details class="widget trend radar" id="radarBox" aria-label="Regenradar">
+    <summary><h2>Regenradar <small>(DWD · −2 h bis +2 h)</small></h2></summary>
+    <div class="radarmap">
+      <div id="radarMap"></div>
+      <div class="status" id="radarStatus">Lade Radar …</div>
+    </div>
+    <div class="radarctl">
+      <button id="radarPlay" class="icon" type="button" aria-label="Abspielen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="radarPlayIcon" d="M8 5v14l11-7z" fill="currentColor"/></svg>
+      </button>
+      <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
+      <span class="rtime" id="radarTime">–</span>
+    </div>
+    <div class="legend rscale">
+      <span>mm/h</span>
+      <span><i style="background:#33ffff"></i>0,1</span><span><i style="background:#019934"></i>0,4</span>
+      <span><i style="background:#4db31b"></i>1</span><span><i style="background:#cce601"></i>3</span>
+      <span><i style="background:#ffff01"></i>5</span><span><i style="background:#ff8901"></i>10</span>
+      <span><i style="background:#fe0000"></i>30</span><span><i style="background:#cc0098"></i>75+</span>
+      <span><i style="background:rgba(128,128,128,.35)"></i>keine Daten</span>
+    </div>
+  </details>
 
   <details class="widget trend" id="trendBox" aria-label="14-Tage-Trend">
     <summary><h2>14-Tage-Trend</h2></summary>
@@ -398,6 +436,10 @@
         <p>Wind: Der Pfeil zeigt, <b>wohin</b> der Wind weht – ↑ heißt Wind aus Süden, → Wind aus Westen. <b>12 ↯39</b> = im Mittel 12, in Böen 39. Farbe: grau schwach, <span style="color:#34c759">grün</span> mäßig, <span style="color:#ff9500">orange</span> frisch, <span style="color:#ff3b30">rot</span> stürmisch. Einheit in den Einstellungen wählbar.</p></div>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect width="72" height="28" fill="#e8e8e8"/><line x1="10" y1="0" x2="10" y2="28" stroke="rgba(255,159,10,.9)" stroke-width="1.5"/><line x1="36" y1="0" x2="36" y2="28" stroke="rgba(140,140,140,.5)"/><line x1="62" y1="0" x2="62" y2="28" stroke="rgba(140,140,140,.75)"/></svg></div>
         <p>Senkrechte Linien: <span style="color:#ff9f0a">orange = jetzt</span>, dünn grau = 12 Uhr mittags, etwas kräftiger = Mitternacht. Die Grafik lässt sich mit Maus oder Finger <b>zur Seite ziehen</b> (bis 14 Tage), „⟲ Jetzt“ springt zurück.</p></div>
+
+      <h3>Regenradar</h3>
+      <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect width="72" height="28" fill="#e9ecef"/><path d="M8 20 C14 6 30 4 38 10 S52 26 64 16" fill="none" stroke="#4db31b" stroke-width="7" stroke-linecap="round"/><circle cx="36" cy="10" r="3" fill="#ffff01"/><circle cx="36" cy="10" r="1.5" fill="#ff8901"/><circle cx="20" cy="18" r="3" fill="#007aff" stroke="#fff"/></svg></div>
+        <p>Radarbild des Deutschen Wetterdienstes: die letzten 2 Stunden gemessen, danach bis etwa 2 Stunden <b>Vorhersage</b>. ▶ spielt die Bilder ab, mit dem Regler wählst du einen Zeitpunkt. Farben: <span style="color:#019934">grün</span> leichter Regen, <b>gelb/orange</b> kräftig, <span style="color:#fe0000">rot/violett</span> Starkregen oder Gewitter. Grau = außerhalb der deutschen Radarabdeckung. Die Karte wird erst beim Aufklappen geladen.</p></div>
 
       <h3>14-Tage-Trends</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><rect x="0" y="0" width="24" height="22" fill="rgba(90,130,190,.12)"/><circle cx="12" cy="6" r="2.5" fill="#ff3b30"/><circle cx="36" cy="4" r="2.5" fill="#ff3b30"/><circle cx="60" cy="9" r="2.5" fill="#ff3b30"/><circle cx="12" cy="17" r="2.5" fill="#007aff"/><circle cx="36" cy="15" r="2.5" fill="#007aff"/><circle cx="60" cy="19" r="2.5" fill="#007aff"/><rect x="0" y="23" width="23" height="5" fill="rgba(252,242,40,1)"/><rect x="24" y="23" width="23" height="5" fill="rgba(252,242,40,.3)"/><rect x="48" y="23" width="24" height="5" fill="#ececec"/></svg></div>
@@ -522,6 +564,153 @@
       $('ensStatus').textContent = 'Ensemble konnte nicht geladen werden (' + e.message + ').';
       $('ensStatus').style.display = 'flex';
     }
+  }
+
+  // ---------- Regenradar ----------
+  // DWD-Radarkomposit „RV“ (Analyse + Vorhersage bis ca. +2 h, 5-min-Raster) als WMS-Bild für den
+  // sichtbaren Kartenausschnitt; alle 10 min ein Bild. Karte und Bilder werden erst beim Aufklappen geladen.
+  const RADAR_WMS = 'https://maps.dwd.de/geoserver/dwd/wms';
+  const RADAR_LAYER = 'dwd:Radar_rv_product_1x1km_ger';
+  const RADAR_CAPS = 'https://maps.dwd.de/geoserver/dwd/Radar_rv_product_1x1km_ger/ows?service=WMS&version=1.3.0&request=GetCapabilities';
+  const RADAR_STEP = 10 * 60 * 1000;
+  const radar = { map: null, overlay: null, frames: [], urls: [], imgs: [], idx: 0, nowIdx: 0, timer: null, loadedAt: 0 };
+
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      js.onload = res; js.onerror = () => rej(new Error('Kartenbibliothek nicht erreichbar'));
+      document.head.appendChild(js);
+    });
+  }
+  const isDark = () => document.documentElement.dataset.theme === 'dark'
+    || (document.documentElement.dataset.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Grundkarte: basemap.de (BKG, grau, frei nutzbar, deckt Deutschland ab wie das Radar);
+  // im Dunkelmodus per Farbfilter umgekehrt
+  function radarBaseTiles() {
+    if (!radar.map) return;
+    if (!radar.base) {
+      radar.base = L.tileLayer('https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_grau/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png', {
+        maxZoom: 12, className: 'basemap',
+        attribution: 'Karte © <a href="https://basemap.de">basemap.de / BKG</a> · Radar © <a href="https://www.dwd.de">DWD</a>' }).addTo(radar.map);
+    }
+    $('radarMap').classList.toggle('dark', isDark());
+  }
+
+  function radarInitMap() {
+    const { lat, lon } = state.loc;
+    radar.map = L.map('radarMap', { scrollWheelZoom: false, zoomControl: true, minZoom: 5, maxZoom: 11 }).setView([lat, lon], 8);
+    radar.map.createPane('radar').style.zIndex = 350;
+    const names = radar.map.createPane('names'); names.style.zIndex = 450; names.style.pointerEvents = 'none'; // für die Ortsmarke
+    radarBaseTiles();
+    radar.marker = L.circleMarker([lat, lon], { radius: 6, weight: 2, color: '#fff', fillColor: css('--accent'), fillOpacity: 1, pane: 'names' }).addTo(radar.map);
+    let t; radar.map.on('moveend', () => { clearTimeout(t); t = setTimeout(radarImages, 250); });
+  }
+
+  // Zeitpunkte: 2 h zurück bis zum letzten Vorhersage-Zeitpunkt laut DWD (ca. +2 h)
+  async function radarFrames() {
+    let end = Date.now() + 2 * 3600e3;
+    try {
+      const x = await (await fetch(RADAR_CAPS)).text();
+      const m = x.match(/<Dimension name="time"[^>]*>\s*[^<\/]+\/([^<\/]+)\//);
+      if (m) end = Date.parse(m[1]);
+    } catch {}
+    const nowR = Math.floor(Date.now() / RADAR_STEP) * RADAR_STEP;
+    radar.frames = [];
+    for (let t = nowR - 2 * 3600e3; t <= end; t += RADAR_STEP) radar.frames.push(t);
+    radar.nowIdx = Math.max(0, radar.frames.indexOf(nowR));
+    $('radarSlider').max = radar.frames.length - 1;
+  }
+
+  function radarUrl(t) {
+    const b = radar.map.getBounds(), sz = radar.map.getSize(), dpr = Math.min(2, devicePixelRatio || 1);
+    const a = L.CRS.EPSG3857.project(b.getSouthWest()), c = L.CRS.EPSG3857.project(b.getNorthEast());
+    return RADAR_WMS + '?service=WMS&version=1.3.0&request=GetMap&styles=&format=image/png&transparent=true&crs=EPSG:3857'
+      + `&layers=${RADAR_LAYER}&bbox=${a.x.toFixed(0)},${a.y.toFixed(0)},${c.x.toFixed(0)},${c.y.toFixed(0)}`
+      + `&width=${Math.round(sz.x * dpr)}&height=${Math.round(sz.y * dpr)}&time=${new Date(t).toISOString().replace('.000', '')}`;
+  }
+  // Bilder für den aktuellen Ausschnitt vorladen, damit die Animation flüssig läuft.
+  // Das hellgraue „keine Daten“-Feld des DWD (außerhalb Deutschlands) wird dabei dezent durchscheinend.
+  function radarTidy(img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let k = 0; k < p.length; k += 4) {
+      if (p[k + 3] && Math.abs(p[k] - 216) < 6 && Math.abs(p[k + 1] - 216) < 6 && Math.abs(p[k + 2] - 216) < 6) {
+        p[k] = p[k + 1] = p[k + 2] = 128; p[k + 3] = 50;
+      }
+    }
+    g.putImageData(d, 0, 0);
+    return new Promise(res => c.toBlob(b => res(b ? URL.createObjectURL(b) : null)));
+  }
+  function radarImages() {
+    if (!radar.map || !radar.frames.length) return;
+    (radar.srcs || []).forEach(u => u && URL.revokeObjectURL(u));
+    radar.bounds = radar.map.getBounds();
+    radar.urls = radar.frames.map(radarUrl);
+    const gen = radar.gen = (radar.gen || 0) + 1;
+    radar.srcs = radar.urls.map(() => null);
+    radar.urls.forEach((u, i) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        let src = null;
+        try { src = await radarTidy(img); } catch {}
+        if (gen !== radar.gen) { if (src) URL.revokeObjectURL(src); return; } // Ausschnitt inzwischen geändert
+        radar.srcs[i] = src;
+        if (i === radar.idx) radarShow(i);
+      };
+      img.src = u;
+    });
+    radarShow(radar.idx);
+  }
+  function radarShow(i) {
+    radar.idx = i;
+    $('radarSlider').value = i;
+    const src = (radar.srcs && radar.srcs[i]) || radar.urls[i];
+    if (!src) return;
+    if (!radar.overlay) radar.overlay = L.imageOverlay(src, radar.bounds, { opacity: 0.8, pane: 'radar' }).addTo(radar.map);
+    else { radar.overlay.setBounds(radar.bounds); radar.overlay.setUrl(src); }
+    const t = radar.frames[i], d = Math.round((t - Date.now()) / 60000);
+    const off = state.data ? state.data.utc_offset_seconds : 0;
+    $('radarTime').innerHTML = `<b>${hhmm(t / 1000, off)}</b> · ` + (d > 4 ? `Vorhersage +${d} min` : d < -9 ? `vor ${-d} min` : 'jetzt');
+  }
+  function radarPlay(on) {
+    clearInterval(radar.timer); radar.timer = null;
+    $('radarPlayIcon').setAttribute('d', on ? 'M7 5h4v14H7zM13 5h4v14h-4z' : 'M8 5v14l11-7z');
+    $('radarPlay').setAttribute('aria-label', on ? 'Pause' : 'Abspielen');
+    if (on) radar.timer = setInterval(() => radarShow((radar.idx + 1) % radar.frames.length), 600);
+  }
+
+  async function radarOpen() {
+    $('radarStatus').textContent = 'Lade Radar …'; $('radarStatus').style.display = 'flex';
+    try {
+      await loadLeaflet();
+      if (!radar.map) radarInitMap(); else { radar.map.invalidateSize(); radarBaseTiles(); }
+      if (Date.now() - radar.loadedAt > 5 * 60e3) {
+        await radarFrames();
+        radar.loadedAt = Date.now();
+        radar.idx = radar.nowIdx;
+      }
+      radarImages();
+      $('radarStatus').style.display = 'none';
+    } catch (e) {
+      $('radarStatus').textContent = 'Radar konnte nicht geladen werden (' + e.message + ').';
+    }
+  }
+  // Ortswechsel: Karte mitführen (nur wenn schon geladen)
+  function radarFollowLoc() {
+    if (!radar.map) return;
+    const ll = [state.loc.lat, state.loc.lon];
+    radar.marker.setLatLng(ll);
+    radar.map.setView(ll, radar.map.getZoom());
   }
 
   // ---------- Kopfzeile ----------
@@ -1374,6 +1563,7 @@
     $('name').textContent = loc.name;
     $('status').textContent = 'Lade Wetterdaten …';
     renderTabs();
+    radarFollowLoc();
     load();
   }
 
@@ -1471,6 +1661,7 @@
   $('theme').addEventListener('change', () => {
     state.opts.theme = $('theme').value; store.set('opts', state.opts);
     applyTheme(); render(); renderEns();
+    if (radar.map) radarBaseTiles();
   });
   $('windUnit').value = state.opts.windUnit;
   $('windUnit').addEventListener('change', () => { state.opts.windUnit = $('windUnit').value; store.set('opts', state.opts); render(); });
@@ -1525,6 +1716,11 @@
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#svg')) hideTip(); });
 
   new ResizeObserver(() => render()).observe($('chart'));
+  // Regenradar: immer zugeklappt beim Start, lädt erst beim Öffnen; zu = Animation anhalten
+  $('radarBox').addEventListener('toggle', () => { if ($('radarBox').open) radarOpen(); else radarPlay(false); });
+  $('radarPlay').addEventListener('click', () => radarPlay(!radar.timer));
+  $('radarSlider').addEventListener('input', e => { radarPlay(false); radarShow(+e.target.value); });
+
   // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
   const boxes = store.get('boxes') || {};
   ['trendBox', 'ensBox'].forEach(id => {
