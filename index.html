@@ -121,6 +121,14 @@
   .head .now { margin-left: 10px; }
   .head .updated { color: var(--muted); font-size: 12px; margin-top: 1px; }
   .head .updated > span + span::before { content: "·"; margin: 0 6px; }
+  .head { position: relative; }
+  .head .updated > span[data-info] { cursor: pointer; }
+  .htip { position: absolute; left: 4px; right: 4px; top: 100%; z-index: 20; margin-top: -6px; }
+  .htip[hidden] { display: none; }
+  .htip > div {
+    display: inline-block; max-width: 100%; background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 9px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
 
   .chart { position: relative; width: 100%; }
   .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -204,6 +212,9 @@
   .radarctl input[type=range]::-moz-range-thumb {
     width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--accent); cursor: pointer;
   }
+  /* Unsichtbare Berührungsfläche: höher als die Leiste (≈ 44 px), Tippen springt sofort an die Stelle */
+  .radarctl .rhit { position: absolute; left: 0; right: 0; top: -8px; bottom: -6px; z-index: 2; cursor: pointer; touch-action: pan-y; }
+  .radarctl input[type=range] { pointer-events: none; } /* Zeiger/Finger gehen über .rhit, Tastatur bleibt am Regler */
   .rtrack { position: absolute; left: 8px; right: 8px; top: 6px; height: 6px; } /* 8 px = halbe Knopfbreite */
   .rtrack i { position: absolute; top: 0; height: 6px; background: var(--border); border-radius: 1px; }
   .rtrack i.ok { background: rgba(10,132,255,.55); }
@@ -384,6 +395,7 @@
         <span class="now"><span class="t" id="curT">–</span><span class="sep">|</span><span class="h" id="curH">–</span></span>
       </div>
       <div class="updated" id="updated">Zuletzt: –</div>
+      <div class="htip" id="htip" hidden><div></div></div>
     </div>
     <div class="chart" id="chart">
       <svg id="svg" role="img" aria-label="Temperatur und Niederschlag der nächsten 24 Stunden"></svg>
@@ -420,6 +432,7 @@
         <input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Zeitpunkt">
         <button type="button" class="nowmark" id="radarNowMark" title="Zur aktuellen Zeit">jetzt</button>
         <div class="rticks" id="radarTicks" hidden></div>
+        <div class="rhit" id="radarHit" aria-hidden="true"></div>
       </div>
     </div>
     <div class="legend rscale">
@@ -470,6 +483,9 @@
       <summary>⚙︎ Einstellungen</summary>
       <div class="opts">
         <label><input type="checkbox" data-opt="tide"> Tide <small>(nur am Meer)</small></label>
+        <label><input type="checkbox" data-opt="aurora"> Polarlicht-Hinweis</label>
+        <label><input type="checkbox" data-opt="meteors"> Sternschnuppen-Nächte</label>
+        <label><input type="checkbox" data-opt="golden"> Goldene &amp; blaue Stunde</label>
         <label><input type="checkbox" data-opt="uv"> UV-Index</label>
         <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
         <label><input type="checkbox" data-opt="clouds"> Wolken</label>
@@ -517,10 +533,18 @@
         <p>Schneefallgrenze – erscheint nur, wenn sie in die Nähe der Ortshöhe kommt (höchstens 500 m darüber).</p></div>
       <div class="ex-row"><div class="ex ex-text">🌊 ±1,9 m</div>
         <p>Nur am Meer: Das Wasser schwankt heute um bis zu 1,9 m nach oben und unten (Tidenhub 3,8 m).</p></div>
+      <div class="ex-row"><div class="ex ex-text">🏊 16,5 °C</div>
+        <p>Nur am Meer: Wassertemperatur an der Oberfläche (Modellwert). Für Seen und Flüsse gibt es keine Daten.</p></div>
+      <div class="ex-row"><div class="ex ex-text">🌌 22–02 Uhr</div>
+        <p>Polarlicht möglich – nur bei starkem Sonnensturm (Kp-Index der NOAA). Im Norden reicht Kp 6, im Süden braucht es 8–9. <b>„schwach“</b> = eher nur auf Handyfotos Richtung Norden. In der Grafik leuchtet der Himmel oben grün – je stärker der Sturm, desto höher und kräftiger (ein leichter Schimmer schon 3 Stufen unter dem nötigen Wert). Ob es klar ist, zeigen die Wolken.</p></div>
+      <div class="ex-row"><div class="ex ex-text">💫 Perseiden</div>
+        <p>Nacht mit dem Maximum eines Sternschnuppen-Stroms. In der Grafik markiert 💫 auch die guten Nächte davor und danach – jeweils bei der besten Stunde (Radiant hoch, Mond und Wolken berücksichtigt).</p></div>
+      <div class="ex-row"><div class="ex ex-text">Antippen</div>
+        <p>Die Einträge in dieser Zeile lassen sich antippen – dann erscheint eine kurze Erklärung mit Details.</p></div>
 
       <h3>Stundengrafik</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><defs><linearGradient id="hx-sky"><stop offset="0" stop-color="#2c2c2c"/><stop offset=".3" stop-color="#2c2c2c"/><stop offset=".45" stop-color="#e8e8e8"/><stop offset=".75" stop-color="#e8e8e8"/><stop offset=".9" stop-color="#2c2c2c"/></linearGradient></defs><rect width="72" height="28" fill="url(#hx-sky)"/></svg></div>
-        <p>Hintergrund: hell = Tag, dunkel = Nacht, weicher Übergang = Dämmerung. Oben stehen die Zeiten: <b>↑ 07:10</b> Sonnenaufgang, <b>↓ 19:08</b> Sonnenuntergang. Bei Mondschein ist die Nacht etwas heller.</p></div>
+        <p>Hintergrund: hell = Tag, dunkel = Nacht, weicher Übergang = Dämmerung. <span style="color:#e0962a">Goldener Schimmer</span> = goldene Stunde (Sonne tiefer als 6°), <span style="color:#3d6fe0">blauer</span> = blaue Stunde (Sonne 4–8° unter dem Horizont) – die genauen Zeiten stehen beim Antippen der Stunde. Oben stehen die Zeiten: <b>↑ 07:10</b> Sonnenaufgang, <b>↓ 19:08</b> Sonnenuntergang. Bei Mondschein ist die Nacht etwas heller.</p></div>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><line x1="0" y1="16" x2="72" y2="16" stroke="#999" stroke-dasharray="3 3"/><path d="M2 24 C20 22 26 8 40 6 S60 10 70 12" fill="none" stroke="#ff3b30" stroke-width="2.5"/><path d="M2 24 C12 23 16 19 21 16" fill="none" stroke="#007aff" stroke-width="2.5"/><path d="M2 27 C20 26 26 12 40 10 S60 14 70 16" fill="none" stroke="#ff3b30" stroke-width="1.1" stroke-dasharray="4 3"/></svg></div>
         <p>Temperatur: <span style="color:var(--warm)">rot über 0 °C</span>, <span style="color:var(--cold)">blau darunter</span>; gestrichelte Linie = 0 °C. Die dünne gestrichelte Kurve ist die <b>gefühlte</b> Temperatur (Wind macht es kälter, Schwüle wärmer). Die Zahlen an der Kurve sind Tiefst- und Höchstwert.</p></div>
       <div class="ex-row"><div class="ex ex-emoji">☀️ ⛅ 🌧️ 🌔</div>
@@ -569,7 +593,8 @@
       <p class="plain" style="margin-top:8px">Gespeicherte Orte, Einstellungen und Zwischenstände (z. B. die Statistik-Trends) liegen nur <b>lokal in deinem Browser</b> (localStorage) und werden nicht übertragen. Löschen: Browser-Daten dieser Seite entfernen.</p>
       <p class="plain" style="margin-top:8px">Um Wetterdaten anzuzeigen, ruft dein Browser <b>direkt</b> folgende Dienste auf. Dabei sehen diese – wie bei jedem Webseitenaufruf – deine IP-Adresse und die Koordinaten des gewählten Orts:</p>
       <ul class="plist">
-        <li><b>Open-Meteo</b> (Schweiz) – Vorhersage, Tide, Ortssuche (Suchbegriff)</li>
+        <li><b>Open-Meteo</b> (Schweiz) – Vorhersage, Tide, Wassertemperatur, Ortssuche (Suchbegriff)</li>
+        <li><b>NOAA Space Weather Prediction Center</b> (USA) – Polarlicht-Vorhersage (Kp-Index); ohne Ortsangabe, abschaltbar</li>
         <li><b>Deutscher Wetterdienst</b> – Radarbilder (nur wenn das Regenradar geöffnet ist)</li>
         <li><b>BKG / basemap.de</b> – Grundkarte des Radars</li>
         <li><b>cdnjs (Cloudflare)</b> – Kartenbibliothek Leaflet (beim Öffnen des Radars)</li>
@@ -583,7 +608,7 @@
   </section>
 
   <p class="note">
-    Wetterdaten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) · Ortsname bei Ortung: BigDataCloud · Mondberechnung nach SunCalc
+    Wetterdaten: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) · Polarlicht: NOAA SWPC · Ortsname bei Ortung: BigDataCloud · Mondberechnung nach SunCalc
   </p>
 </main>
 
@@ -605,12 +630,13 @@
     editTabs: false,
     data: null,
     tide: null, // { t: unix[], h: m[] } oder null (kein Meer)
+    sst: null,  // Wassertemperatur { t: unix[], v: °C[] } oder null (kein Meer)
     fetchedAt: null,
     lastAttempt: 0,
     ens: null,  // 14-Tage-Statistik (Ensemble-Mittel), höchstens alle 12 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
-    opts: Object.assign({ tide: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
+    opts: Object.assign({ tide: true, aurora: true, meteors: true, golden: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
       windUnit: 'kmh', start: 'last', theme: 'auto' }, store.get('opts') || {}),
   };
 
@@ -634,19 +660,21 @@
       + '&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,sunshine_duration,daylight_duration'
       + '&current=temperature_2m,relative_humidity_2m'
       + '&timezone=auto&timeformat=unixtime&forecast_days=14'; // bis 14 Tage zählt als ein (gewichteter) Abruf
-    // Tide (Meeresspiegel inkl. Gezeiten) aus dem Meeresmodell; im Binnenland nur leere Werte
+    // Tide (Meeresspiegel inkl. Gezeiten) und Wassertemperatur aus dem Meeresmodell; im Binnenland nur leere Werte
     const tideUrl = 'https://marine-api.open-meteo.com/v1/marine'
-      + `?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl&timezone=auto&timeformat=unixtime&forecast_days=7`;
+      + `?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl,sea_surface_temperature&timezone=auto&timeformat=unixtime&forecast_days=7`;
     const key = tideKey(state.loc);
-    const wantTide = state.opts.tide && !noTide.has(key);
+    const wantTide = !noTide.has(key); // auch bei ausgeschalteter Tide – für die Wassertemperatur
     const tideReq = wantTide ? fetch(tideUrl).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null);
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      const [data, tj] = await Promise.all([r.json(), tideReq]);
+      const [data, tj] = await Promise.all([r.json(), tideReq, loadKp()]);
       if (seq !== loadSeq) return; // inzwischen anderer Ort/neuerer Abruf
       const th = tj && tj.hourly && tj.hourly.sea_level_height_msl;
       state.tide = th && th.some(v => v != null) ? { t: tj.hourly.time, h: th } : null;
+      const sv = tj && tj.hourly && tj.hourly.sea_surface_temperature;
+      state.sst = sv && sv.some(v => v != null) ? { t: tj.hourly.time, v: sv } : null;
       if (th && !state.tide) { noTide.add(key); store.set('notide', [...noTide]); } // Antwort ohne Werte = kein Meer
       state.data = data;
       state.fetchedAt = new Date();
@@ -1060,7 +1088,7 @@
     $('name').textContent = state.loc.name;
     $('name').title = [state.loc.name, state.loc.region].filter(Boolean).join(', ');
     const nowS = Date.now() / 1000, off = d.utc_offset_seconds;
-    const span = (text, title) => { const e = document.createElement('span'); e.textContent = text; if (title) e.title = title; return e; };
+    const span = (text, info) => { const e = document.createElement('span'); e.textContent = text; if (info) e.dataset.info = info; return e; };
     const parts = [span('Zuletzt: ' + state.fetchedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))];
 
     // Mond: Phase, beleuchteter Anteil, nächster Auf- und Untergang (innerhalb 24 h)
@@ -1090,7 +1118,44 @@
         parts.push(span(`🌊 ±${fmt1(hub / 2)} m`, `Tidenhub ${fmt1(hub)} m in den nächsten 24 h (Modellwert, nicht für die Navigation)`));
       }
     }
+    // Wassertemperatur (Meeresoberfläche, nur am Meer): aktueller Stundenwert
+    if (state.sst) {
+      const j = state.sst.t.findIndex(t => t + H > nowS), v = j >= 0 ? state.sst.v[j] : null;
+      if (v != null) parts.push(span(`🏊 ${fmt1(v)} °C`, `Wassertemperatur an der Meeresoberfläche (Modellwert, küstennah) – jetzt ${fmt1(v)} °C`));
+    }
+    // Polarlicht: dunkle Stunden der nächsten 24 h, in denen der Kp-Index hier reichen könnte
+    if (state.opts.aurora && kp.data) {
+      const hrs = [];
+      // nur die erste zusammenhängende Nacht (das 24-h-Fenster kann den Beginn der nächsten streifen)
+      for (let t = Math.floor(nowS / H) * H; t < nowS + DAY; t += H) {
+        const lv = auroraLevel(t + H / 2);
+        if (lv) hrs.push({ t, lv }); else if (hrs.length) break;
+      }
+      if (hrs.length) {
+        const best = Math.max(...hrs.map(h => h.lv)), a = hrs[0].t, b = hrs[hrs.length - 1].t + H;
+        const kMax = Math.max(...hrs.map(h => kpAt(h.t + H / 2)));
+        const cc = d.hourly.cloud_cover, ci = hrs.map(h => cc[d.hourly.time.indexOf(h.t)]).filter(v => v != null);
+        const cloud = ci.length ? Math.round(ci.reduce((p, q) => p + q, 0) / ci.length) : null;
+        parts.push(span(`🌌 ${best === 2 ? '' : 'schwach '}${String(locHour(a)).padStart(2, '0')}–${String(locHour(b)).padStart(2, '0')} Uhr`,
+          (best === 2 ? 'Polarlicht möglich – tief am Nordhorizont, abseits vom Stadtlicht'
+            : 'Geringe Polarlicht-Chance – mit bloßem Auge kaum, eher auf Handy-/Kamerafotos Richtung Norden')
+          + ` (Kp bis ${fmt1(kMax)}, hier nötig ≈ ${fmt1(kpNeed(state.loc.lat, state.loc.lon))}; Vorhersage NOAA)`
+          + (cloud != null ? ` · Bewölkung Ø ${cloud} %${cloud >= 80 ? ' – vermutlich verdeckt' : ''}` : '')));
+      }
+    }
+    // Sternschnuppen: nur in der Nacht des Maximums (die Nächte davor/danach zeigt die Grafik)
+    if (state.opts.meteors) {
+      let best = null;
+      for (let t = Math.floor(nowS / H) * H; t < nowS + DAY; t += H) {
+        const j = d.hourly.time.indexOf(t), m = meteorAt(t + H / 2, j >= 0 ? d.hourly.cloud_cover[j] : null);
+        if (m && Math.abs(m.dd) < 0.75 && (!best || m.rate > best.rate)) best = { ...m, t };
+      }
+      if (best) parts.push(span(`💫 ${best.s.n}`, `Sternschnuppen-Maximum der ${best.s.n} – beste Zeit um ${String(locHour(best.t)).padStart(2, '0')} Uhr: `
+        + `≈ ${Math.round(best.rate)} pro Stunde (ohne Wolken ${Math.round(best.ideal)}, bei idealem Himmel bis ${best.s.zhr})`
+        + (best.moon > 0.3 ? '. Mondlicht überstrahlt schwache Meteore' : '') + '. Abseits von Stadtlicht, Blick nach oben, Augen 15 min an die Dunkelheit gewöhnen.'));
+    }
     $('updated').replaceChildren(...parts);
+    $('htip').hidden = true;
     $('dataAge').textContent = 'Stand ' + state.fetchedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     $('curT').textContent = fmt1(d.current.temperature_2m) + ' °C';
     $('curH').textContent = Math.round(d.current.relative_humidity_2m) + ' %';
@@ -1151,6 +1216,99 @@
     const gmst = (18.697374558 + 24.06570982441908 * d) % 24;
     const ha = (gmst * 15 + lon) * rad - ra;
     return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+  }
+
+  // ---------- Polarlicht ----------
+  // Kp-Index (Stärke des geomagnetischen Sturms, 0–9) der NOAA: gemessen + Vorhersage für 3 Tage in 3-h-Blöcken.
+  // Gilt weltweit gleich → einmal laden, höchstens alle 3 h neu (≈ 7 KB, ohne Ortsangabe).
+  const kp = { data: null, at: 0 };
+  async function loadKp() {
+    if (!state.opts.aurora || Date.now() - kp.at < 3 * 3600e3) return;
+    kp.at = Date.now();
+    try {
+      const r = await fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json');
+      if (!r.ok) throw new Error();
+      kp.data = (await r.json()).filter(e => e && e.kp != null && e.time_tag)
+        .map(e => ({ t: Date.parse(e.time_tag + 'Z') / 1000, kp: +e.kp, obs: e.observed }));
+    } catch { kp.at = Date.now() - 2.5 * 3600e3; } // Fehler: in 30 min erneut versuchen
+  }
+  const kpAt = t => { const b = kp.data && kp.data.find(e => t >= e.t && t < e.t + 3 * H); return b ? b.kp : null; };
+  // Nötiger Kp, damit Polarlicht am Nordhorizont zu sehen ist – Faustregel für Europa:
+  // Kp 5 ≈ 56° N (Dänemark), 6 ≈ 54° (Küste), 7 ≈ 51,5° (Mitte), 8 ≈ 49° (Süden), 9 ≈ 47° (Alpen)
+  const kpNeed = (lat, lon) => lat < 35 || lon < -30 || lon > 45 ? null : Math.min(9, Math.max(3, 5 + (56 - lat) / 2.3));
+  // Kp und nötiger Kp zur Zeit t – nur bei Dunkelheit (Sonne > 12° unter dem Horizont), sonst null
+  function auroraKp(t) {
+    if (!state.opts.aurora || !kp.data) return null;
+    const { lat, lon } = state.loc, need = kpNeed(lat, lon), k = kpAt(t);
+    if (need == null || k == null || sunElevation(t, lat, lon) > -12) return null;
+    return { k, need };
+  }
+  // Kopfzeile: 0 = nein, 1 = geringe Chance (eher auf Fotos), 2 = möglich
+  function auroraLevel(t) {
+    const a = auroraKp(t);
+    return !a ? 0 : a.k >= a.need ? 2 : a.k >= a.need - 1 ? 1 : 0;
+  }
+  // Grafik: Stärke 0…1 – leichter Schimmer ab 3 unter dem nötigen Kp (Alpenrand: ab Kp 6), voll ab dem nötigen Kp
+  function auroraGlow(t) {
+    const a = auroraKp(t);
+    return !a || a.k < a.need - 3 ? null : Math.min(1, (a.k - (a.need - 3)) / 3);
+  }
+
+  // ---------- Sternschnuppen ----------
+  // Große Meteorströme. Maximum als Sonnenlänge λ (J2000) → fällt jedes Jahr auf dieselbe Stelle der Erdbahn,
+  // ZHR = Meteore/h unter Idealbedingungen, w = Abfall auf ~37 % nach w Tagen, Radiant (Rektaszension/Deklination in °)
+  const SHOWERS = [
+    { n: 'Quadrantiden', l: 283.15, zhr: 110, w: 0.6, ra: 230, dec: 49 },
+    { n: 'Lyriden', l: 32.32, zhr: 18, w: 1.2, ra: 271, dec: 34 },
+    { n: 'Eta-Aquariiden', l: 45.5, zhr: 50, w: 5, ra: 338, dec: -1 },
+    { n: 'Perseiden', l: 140.0, zhr: 100, w: 2.5, ra: 48, dec: 58 },
+    { n: 'Orioniden', l: 208, zhr: 20, w: 3, ra: 95, dec: 16 },
+    { n: 'Leoniden', l: 235.27, zhr: 15, w: 1, ra: 152, dec: 22 },
+    { n: 'Geminiden', l: 262.2, zhr: 150, w: 1.2, ra: 112, dec: 33 },
+    { n: 'Ursiden', l: 270.7, zhr: 10, w: 0.8, ra: 217, dec: 76 },
+  ];
+  const METEOR_MIN = 8; // ab so vielen erwarteten Meteoren/h gilt eine Stunde als „geeignet“
+  function sunLongitude(t) { // ekliptikale Länge der Sonne (J2000), Grad
+    const d = (t - 946728000) / DAY, g = (357.529 + 0.98560028 * d) * Math.PI / 180;
+    return ((280.459 + 0.98564736 * d + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g) - 0.01397 * d / 365.25) % 360 + 360) % 360;
+  }
+  function starAltitude(t, ra, dec, lat, lon) {
+    const r = Math.PI / 180, d = (t - 946728000) / DAY;
+    const ha = (((18.697374558 + 24.06570982441908 * d) % 24) * 15 + lon - ra) * r;
+    return Math.asin(Math.sin(lat * r) * Math.sin(dec * r) + Math.cos(lat * r) * Math.cos(dec * r) * Math.cos(ha)) / r;
+  }
+  // Erwartete Meteore/h zur Zeit t: ZHR × Aktivität (Abstand zum Maximum) × Radiantenhöhe × Mondlicht × Bewölkung
+  function meteorAt(t, cloud) {
+    if (!state.opts.meteors) return null;
+    const { lat, lon } = state.loc;
+    if (sunElevation(t, lat, lon) > -12) return null;
+    const L = sunLongitude(t);
+    let best = null;
+    for (const s of SHOWERS) {
+      const dd = ((L - s.l + 540) % 360 - 180) / 0.9856; // Tage seit (+) bzw. bis (−) zum Maximum
+      if (Math.abs(dd) > 4 * s.w) continue;
+      const alt = starAltitude(t, s.ra, s.dec, lat, lon);
+      if (alt < 10) continue;
+      const ma = Moon.altitude(t, lat, lon), moon = ma > 0 ? Moon.illumination(t).fraction * Math.min(1, ma / 20) : 0;
+      const ideal = s.zhr * Math.exp(-Math.abs(dd) / s.w) * Math.sin(alt * Math.PI / 180) * (1 - 0.75 * moon);
+      const rate = ideal * (1 - (cloud ?? 0) / 100);
+      if (!best || rate > best.rate) best = { s, rate, ideal, dd, moon, cloud };
+    }
+    return best;
+  }
+  const meteorTxt = m => `${m.s.n}${Math.abs(m.dd) < 0.75 ? ' (Maximum)' : ''}: ≈ ${Math.round(m.rate)} pro Stunde`
+    + (m.moon > 0.3 ? ', Mondlicht stört' : '') + (m.cloud >= 50 ? `, ${Math.round(m.cloud)} % bewölkt` : '');
+
+  // Goldene Stunde: Sonne zwischen +6° und −4°, blaue Stunde: zwischen −4° und −8°. Liefert Abschnitte in [a, b].
+  function sunBands(a, b, lat, lon) {
+    const out = [], kind = e => e <= 6 && e > -4 ? 'gold' : e <= -4 && e > -8 ? 'blue' : null;
+    let cur = null;
+    for (let t = a; t <= b; t += 60) {
+      const k = kind(sunElevation(t, lat, lon));
+      if (k !== (cur && cur.k)) { if (cur) { cur.to = t; out.push(cur); } cur = k ? { k, from: t } : null; }
+    }
+    if (cur) { cur.to = b; cur.open = true; out.push(cur); }
+    return out;
   }
 
   // Mondstand und Mondphase (vereinfachte Mondbahn nach SunCalc von V. Agafonkin, BSD-Lizenz)
@@ -1352,10 +1510,33 @@
     for (let t = t0; t <= t1; t += 300) stops.push(t);
     // exakte Kanten bei Sonnenauf-/-untergang ergänzen
     sr.concat(ss).forEach(t => { if (t > t0 && t < t1) stops.push(t - 1, t); });
+    // Goldene/blaue Stunde tönen den Hintergrund (1° weicher Übergang an den Grenzen)
+    const goldC = hex2rgb('#ffb13b'), blueC = hex2rgb('#3d6fe0');
+    const ramp = (e, a, b) => Math.max(0, Math.min(1, e - a, b - e));
+    const skyColor = t => {
+      const f = lightness(t);
+      let c = nightC.map((v, i) => v + (dayC[i] - v) * f);
+      if (state.opts.golden) {
+        const e = sunElevation(t, lat, lon), g = ramp(e, -4, 6) * .42, b = ramp(e, -8, -4) * .36;
+        c = c.map((v, i) => v + (goldC[i] - v) * g).map((v, i) => v + (blueC[i] - v) * b);
+      }
+      return 'rgb(' + c.map(Math.round).join(',') + ')';
+    };
+    if (state.opts.golden) for (let t = t0; t <= t1; t += 60) if (Math.abs(sunElevation(t, lat, lon) - 3) < 7.5 && t % 120 === 0) stops.push(t); // feiner in der Dämmerung
     stops.sort((p, q) => p - q).forEach(t => {
-      el('stop', { offset: (t - t0) / DAY, 'stop-color': mix(nightC, dayC, lightness(t)) }, sky);
+      el('stop', { offset: (t - t0) / DAY, 'stop-color': skyColor(t) }, sky);
     });
     el('rect', { x: m.l, y: m.t, width: pw, height: ph, fill: 'url(#sky)' }, plot);
+    // Polarlicht: grünes Leuchten von oben in den Stunden mit Chance (kräftig = möglich, blass = gering)
+    if (state.opts.aurora && kp.data) {
+      const ag = el('linearGradient', { id: 'aurora', x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+      el('stop', { offset: 0, 'stop-color': '#3dff9a', 'stop-opacity': .6 }, ag);
+      el('stop', { offset: 1, 'stop-color': '#3dff9a', 'stop-opacity': 0 }, ag);
+      for (let k = 0; k < 24; k++) {
+        const g = auroraGlow(t0 + k * H + H / 2); // Höhe und Deckkraft wachsen mit dem Kp
+        if (g != null) el('rect', { x: x(t0 + k * H), y: m.t, width: pw / 24 + .5, height: ph * (.18 + .42 * g), fill: 'url(#aurora)', opacity: .22 + .78 * g }, plot);
+      }
+    }
 
     // Stündliches Raster (dezent), Mitternachts- und Mittagslinie
     const hgrid = el('g', { stroke: 'rgba(128,128,128,.14)', 'stroke-width': 1 }, plot);
@@ -1661,7 +1842,19 @@
     // Hover-Ebene
     const cursor = el('line', { y1: m.t, y2: m.t + ph, stroke: 'rgba(128,128,128,.9)', 'stroke-width': 1, visibility: 'hidden' }, svg);
     const dot = el('circle', { r: 4, fill: '#fff', 'stroke-width': 2, visibility: 'hidden' }, svg);
-    view = { m, pw, ph, t0, off, idx, temps, x, y, cursor, dot, W };
+    // Sternschnuppen: 💫 oben bei der besten Stunde jeder geeigneten Nacht (auch vor/nach dem Maximum)
+    if (state.opts.meteors) {
+      let run = null;
+      const flush = () => { if (run) el('text', { x: x(run.t), y: m.t + 13, 'font-size': 12, 'text-anchor': 'middle' }, svg).textContent = '💫'; run = null; };
+      for (let k = 0; k < 24; k++) {
+        const t = t0 + k * H + H / 2, mt = meteorAt(t, d.hourly.cloud_cover[idx[k]]);
+        if (mt && mt.rate >= METEOR_MIN) { if (!run || mt.rate > run.rate) run = { t, rate: mt.rate }; }
+        else if (!mt || sunElevation(t, lat, lon) > -12) flush(); // Nacht zu Ende
+      }
+      flush();
+    }
+    const bands = state.opts.golden ? sunBands(t0 - 3 * H, t1 + 3 * H, lat, lon) : [];
+    view = { m, pw, ph, t0, off, idx, temps, x, y, cursor, dot, W, bands };
   }
 
   function showTip(ev) {
@@ -1700,7 +1893,16 @@
       + (d.hourly.wind_speed_10m
         ? `<br>💨 ${windVal(d.hourly.wind_speed_10m[i])} ${windUnitTxt()} aus ${compass(d.hourly.wind_direction_10m[i])}`
           + (d.hourly.wind_gusts_10m ? ` · Böen ${windVal(d.hourly.wind_gusts_10m[i])} ${windUnitTxt()}` : '')
-        : '');
+        : '')
+      + (() => { // Extras der Stunde t … t+1 h
+        const out = [], a = auroraKp(t + H / 2), mt = meteorAt(t + H / 2, d.hourly.cloud_cover[i]);
+        if (a && a.k >= a.need - 3) out.push(`🌌 Kp ${fmt1(a.k)} – hier nötig ≈ ${fmt1(a.need)}` + (a.k >= a.need ? ' (Polarlicht möglich)' : a.k >= a.need - 1 ? ' (eher auf Fotos)' : ' (nur leichter Schimmer)'));
+        if (mt && mt.rate >= 1) out.push('💫 ' + meteorTxt(mt));
+        const hm = u => hhmm(u, view.off);
+        view.bands.filter(b => b.from < t + H && b.to > t).forEach(b =>
+          out.push(`${b.k === 'gold' ? '🌇 Goldene' : '🌆 Blaue'} Stunde ${hm(b.from)}–${hm(b.to)}`));
+        return out.length ? '<br>' + out.join('<br>') : '';
+      })();
     tip.style.display = 'block';
     const left = cx * rect.width / view.W;
     const tw = tip.offsetWidth;
@@ -2061,9 +2263,19 @@
       store.set('opts', state.opts);
       // Tide eingeschaltet, aber noch nicht geladen → nachladen; sonst nur neu zeichnen
       if (cb.dataset.opt === 'tide' && cb.checked && !state.tide && !noTide.has(tideKey(state.loc))) load();
+      else if (cb.dataset.opt === 'aurora' && cb.checked && !kp.data) loadKp().then(render);
       else render();
     });
   });
+
+  // Kopfzeile: Einträge mit Erklärung antippen → Info-Blase (auf dem iPhone gibt es keinen Hover-Tooltip)
+  $('updated').addEventListener('click', e => {
+    const sp = e.target.closest('span[data-info]'), tip = $('htip');
+    if (!sp || (!tip.hidden && tip.dataset.for === sp.textContent)) { tip.hidden = true; return; }
+    tip.firstElementChild.textContent = sp.dataset.info; tip.dataset.for = sp.textContent; tip.hidden = false;
+    e.stopPropagation();
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('#htip')) $('htip').hidden = true; });
 
   // Ziehen verschiebt die Ansicht stundenweise in die Zukunft (und zurück bis „jetzt“);
   // ohne Ziehen zeigt Bewegen/Antippen den Tooltip
@@ -2112,6 +2324,25 @@
   // Umschalter sitzt in der Kopfzeile: Klick darf die Karte nicht zuklappen
   document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); radarSetMode(b.dataset.mode); }));
   $('radarSlider').addEventListener('input', e => { radar.autoplay = false; radarPlay(false); radarShow(+e.target.value); });
+  // Berührung/Klick irgendwo auf der Leiste: sofort dorthin springen, Ziehen scrubbt weiter
+  (() => {
+    const hit = $('radarHit'), sl = $('radarSlider'); let active = null;
+    const seek = e => {
+      const r = sl.getBoundingClientRect(), max = +sl.max; if (!max) return;
+      const f = Math.min(1, Math.max(0, (e.clientX - r.left - 8) / Math.max(1, r.width - 16))); // 8 px = halbe Knopfbreite
+      const i = Math.round(f * max);
+      if (i !== radar.idx) { sl.value = i; radarShow(i); }
+    };
+    hit.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      active = e.pointerId; try { hit.setPointerCapture(e.pointerId); } catch {}
+      radar.autoplay = false; radarPlay(false);
+      const n = $('radarNowMark').getBoundingClientRect(); // Tipp aufs „jetzt“-Etikett rastet genau ein
+      if (n.width && e.clientX >= n.left && e.clientX <= n.right && e.clientY >= n.top - 4) radarShow(radar.nowIdx); else seek(e);
+    });
+    hit.addEventListener('pointermove', e => { if (e.pointerId === active) seek(e); });
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hit.addEventListener(ev, e => { if (e.pointerId === active) active = null; });
+  })();
   $('radarNowMark').addEventListener('click', () => { radar.autoplay = false; radarPlay(false); radarShow(radar.nowIdx); });
 
   // Trend-Karten: Auf-/Zu-Zustand lokal merken, beim Öffnen neu zeichnen (zugeklappt ist die Breite 0)
