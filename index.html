@@ -485,7 +485,6 @@
         <label><input type="checkbox" data-opt="tide"> Tide <small>(nur am Meer)</small></label>
         <label><input type="checkbox" data-opt="aurora"> Polarlicht-Hinweis</label>
         <label><input type="checkbox" data-opt="meteors"> Sternschnuppen-Nächte</label>
-        <label><input type="checkbox" data-opt="golden"> Goldene &amp; blaue Stunde</label>
         <label><input type="checkbox" data-opt="uv"> UV-Index</label>
         <label><input type="checkbox" data-opt="feels"> Gefühlte Temperatur</label>
         <label><input type="checkbox" data-opt="clouds"> Wolken</label>
@@ -544,7 +543,7 @@
 
       <h3>Stundengrafik</h3>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><defs><linearGradient id="hx-sky"><stop offset="0" stop-color="#2c2c2c"/><stop offset=".3" stop-color="#2c2c2c"/><stop offset=".45" stop-color="#e8e8e8"/><stop offset=".75" stop-color="#e8e8e8"/><stop offset=".9" stop-color="#2c2c2c"/></linearGradient></defs><rect width="72" height="28" fill="url(#hx-sky)"/></svg></div>
-        <p>Hintergrund: hell = Tag, dunkel = Nacht, weicher Übergang = Dämmerung. <span style="color:#e0962a">Goldener Schimmer</span> = goldene Stunde (Sonne tiefer als 6°), <span style="color:#3d6fe0">blauer</span> = blaue Stunde (Sonne 4–8° unter dem Horizont) – die genauen Zeiten stehen beim Antippen der Stunde. Oben stehen die Zeiten: <b>↑ 07:10</b> Sonnenaufgang, <b>↓ 19:08</b> Sonnenuntergang. Bei Mondschein ist die Nacht etwas heller.</p></div>
+        <p>Hintergrund: hell = Tag, dunkel = Nacht, weicher Übergang = Dämmerung. Oben stehen die Zeiten: <b>↑ 07:10</b> Sonnenaufgang, <b>↓ 19:08</b> Sonnenuntergang. Bei Mondschein ist die Nacht etwas heller.</p></div>
       <div class="ex-row"><div class="ex"><svg viewBox="0 0 72 28"><line x1="0" y1="16" x2="72" y2="16" stroke="#999" stroke-dasharray="3 3"/><path d="M2 24 C20 22 26 8 40 6 S60 10 70 12" fill="none" stroke="#ff3b30" stroke-width="2.5"/><path d="M2 24 C12 23 16 19 21 16" fill="none" stroke="#007aff" stroke-width="2.5"/><path d="M2 27 C20 26 26 12 40 10 S60 14 70 16" fill="none" stroke="#ff3b30" stroke-width="1.1" stroke-dasharray="4 3"/></svg></div>
         <p>Temperatur: <span style="color:var(--warm)">rot über 0 °C</span>, <span style="color:var(--cold)">blau darunter</span>; gestrichelte Linie = 0 °C. Die dünne gestrichelte Kurve ist die <b>gefühlte</b> Temperatur (Wind macht es kälter, Schwüle wärmer). Die Zahlen an der Kurve sind Tiefst- und Höchstwert.</p></div>
       <div class="ex-row"><div class="ex ex-emoji">☀️ ⛅ 🌧️ 🌔</div>
@@ -636,7 +635,7 @@
     ens: null,  // 14-Tage-Statistik (Ensemble-Mittel), höchstens alle 12 h neu geladen
     offset: 0, // Verschiebung der Ansicht in Stunden ab der aktuellen Stunde (Ziehen)
     // Anzeige-Einstellungen, lokal gespeichert
-    opts: Object.assign({ tide: true, aurora: true, meteors: true, golden: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
+    opts: Object.assign({ tide: true, aurora: true, meteors: true, uv: true, feels: true, clouds: true, windbar: true, symbols: true, trendLegend: true,
       windUnit: 'kmh', start: 'last', theme: 'auto' }, store.get('opts') || {}),
   };
 
@@ -1299,18 +1298,6 @@
   const meteorTxt = m => `${m.s.n}${Math.abs(m.dd) < 0.75 ? ' (Maximum)' : ''}: ≈ ${Math.round(m.rate)} pro Stunde`
     + (m.moon > 0.3 ? ', Mondlicht stört' : '') + (m.cloud >= 50 ? `, ${Math.round(m.cloud)} % bewölkt` : '');
 
-  // Goldene Stunde: Sonne zwischen +6° und −4°, blaue Stunde: zwischen −4° und −8°. Liefert Abschnitte in [a, b].
-  function sunBands(a, b, lat, lon) {
-    const out = [], kind = e => e <= 6 && e > -4 ? 'gold' : e <= -4 && e > -8 ? 'blue' : null;
-    let cur = null;
-    for (let t = a; t <= b; t += 60) {
-      const k = kind(sunElevation(t, lat, lon));
-      if (k !== (cur && cur.k)) { if (cur) { cur.to = t; out.push(cur); } cur = k ? { k, from: t } : null; }
-    }
-    if (cur) { cur.to = b; cur.open = true; out.push(cur); }
-    return out;
-  }
-
   // Mondstand und Mondphase (vereinfachte Mondbahn nach SunCalc von V. Agafonkin, BSD-Lizenz)
   const Moon = (() => {
     const rad = Math.PI / 180, e = rad * 23.4397;
@@ -1510,21 +1497,8 @@
     for (let t = t0; t <= t1; t += 300) stops.push(t);
     // exakte Kanten bei Sonnenauf-/-untergang ergänzen
     sr.concat(ss).forEach(t => { if (t > t0 && t < t1) stops.push(t - 1, t); });
-    // Goldene/blaue Stunde tönen den Hintergrund (1° weicher Übergang an den Grenzen)
-    const goldC = hex2rgb('#ffb13b'), blueC = hex2rgb('#3d6fe0');
-    const ramp = (e, a, b) => Math.max(0, Math.min(1, e - a, b - e));
-    const skyColor = t => {
-      const f = lightness(t);
-      let c = nightC.map((v, i) => v + (dayC[i] - v) * f);
-      if (state.opts.golden) {
-        const e = sunElevation(t, lat, lon), g = ramp(e, -4, 6) * .42, b = ramp(e, -8, -4) * .36;
-        c = c.map((v, i) => v + (goldC[i] - v) * g).map((v, i) => v + (blueC[i] - v) * b);
-      }
-      return 'rgb(' + c.map(Math.round).join(',') + ')';
-    };
-    if (state.opts.golden) for (let t = t0; t <= t1; t += 60) if (Math.abs(sunElevation(t, lat, lon) - 3) < 7.5 && t % 120 === 0) stops.push(t); // feiner in der Dämmerung
     stops.sort((p, q) => p - q).forEach(t => {
-      el('stop', { offset: (t - t0) / DAY, 'stop-color': skyColor(t) }, sky);
+      el('stop', { offset: (t - t0) / DAY, 'stop-color': mix(nightC, dayC, lightness(t)) }, sky);
     });
     el('rect', { x: m.l, y: m.t, width: pw, height: ph, fill: 'url(#sky)' }, plot);
     // Polarlicht: grünes Leuchten von oben in den Stunden mit Chance (kräftig = möglich, blass = gering)
@@ -1534,7 +1508,11 @@
       el('stop', { offset: 1, 'stop-color': '#3dff9a', 'stop-opacity': 0 }, ag);
       for (let k = 0; k < 24; k++) {
         const g = auroraGlow(t0 + k * H + H / 2); // Höhe und Deckkraft wachsen mit dem Kp
-        if (g != null) el('rect', { x: x(t0 + k * H), y: m.t, width: pw / 24 + .5, height: ph * (.18 + .42 * g), fill: 'url(#aurora)', opacity: .22 + .78 * g }, plot);
+        if (g == null) continue;
+        // Wolken verdecken: Deckkraft sinkt mit der Bewölkung dieser Stunde (bei 100 % bleibt ein Rest von 15 %)
+        const cc = [idx[k], idx[k + 1]].map(i => d.hourly.cloud_cover[i]).filter(v => v != null);
+        const clear = 1 - .85 * (cc.length ? cc.reduce((p, q) => p + q, 0) / cc.length : 0) / 100;
+        el('rect', { x: x(t0 + k * H), y: m.t, width: pw / 24 + .5, height: ph * (.18 + .42 * g), fill: 'url(#aurora)', opacity: (.22 + .78 * g) * clear }, plot);
       }
     }
 
@@ -1853,8 +1831,7 @@
       }
       flush();
     }
-    const bands = state.opts.golden ? sunBands(t0 - 3 * H, t1 + 3 * H, lat, lon) : [];
-    view = { m, pw, ph, t0, off, idx, temps, x, y, cursor, dot, W, bands };
+    view = { m, pw, ph, t0, off, idx, temps, x, y, cursor, dot, W };
   }
 
   function showTip(ev) {
@@ -1898,9 +1875,6 @@
         const out = [], a = auroraKp(t + H / 2), mt = meteorAt(t + H / 2, d.hourly.cloud_cover[i]);
         if (a && a.k >= a.need - 3) out.push(`🌌 Kp ${fmt1(a.k)} – hier nötig ≈ ${fmt1(a.need)}` + (a.k >= a.need ? ' (Polarlicht möglich)' : a.k >= a.need - 1 ? ' (eher auf Fotos)' : ' (nur leichter Schimmer)'));
         if (mt && mt.rate >= 1) out.push('💫 ' + meteorTxt(mt));
-        const hm = u => hhmm(u, view.off);
-        view.bands.filter(b => b.from < t + H && b.to > t).forEach(b =>
-          out.push(`${b.k === 'gold' ? '🌇 Goldene' : '🌆 Blaue'} Stunde ${hm(b.from)}–${hm(b.to)}`));
         return out.length ? '<br>' + out.join('<br>') : '';
       })();
     tip.style.display = 'block';
