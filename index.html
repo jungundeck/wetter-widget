@@ -759,15 +759,17 @@
     let t; radar.map.on('moveend', () => { clearTimeout(t); t = setTimeout(radarImages, 250); });
     // Touchscreen: ein Finger scrollt die Seite, zwei Finger verschieben/zoomen die Karte.
     // Einzelne Finger werden abgefangen, bevor Leaflet sie sieht (Maus/Trackpad bleiben unberührt).
-    const box = $('radarMap'); let hintT;
+    // Zwei getrennte Timer: Loslassen bricht nur das Einblenden ab, das Ausblenden läuft immer weiter.
+    const box = $('radarMap'), hint = $('radarHint'); let showT, hideT;
+    const hideHint = () => { clearTimeout(hideT); hint.hidden = true; };
     box.addEventListener('touchstart', e => {
+      clearTimeout(showT);
       if (e.touches.length === 1) {
         e.stopPropagation();
-        clearTimeout(hintT);
-        hintT = setTimeout(() => { $('radarHint').hidden = false; hintT = setTimeout(() => { $('radarHint').hidden = true; }, 1200); }, 250);
-      } else { clearTimeout(hintT); $('radarHint').hidden = true; }
+        showT = setTimeout(() => { hint.hidden = false; clearTimeout(hideT); hideT = setTimeout(hideHint, 1200); }, 250);
+      } else hideHint();
     }, { capture: true, passive: true });
-    box.addEventListener('touchend', () => clearTimeout(hintT), { capture: true, passive: true });
+    for (const ev of ['touchend', 'touchcancel']) box.addEventListener(ev, () => clearTimeout(showT), { capture: true, passive: true });
   }
 
   // Zeitpunkte: 2 h zurück bis zum letzten Vorhersage-Zeitpunkt laut DWD (ca. +2 h)
