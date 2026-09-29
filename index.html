@@ -39,6 +39,7 @@
     --rain-prob: 10,132,255;             /* Wahrscheinlichkeits-Leiste (RGB, Deckkraft = %) */
     /* 14-Tage-Trend */
     --weekend: rgba(90,130,190,.10);
+    --rainp: #0a5fc8;                    /* Regenwahrscheinlichkeit in der Statistik */
     --trend-line: #c3cdd6;
     --cell: #ececec;
     --sun: 252,242,40;                   /* Sonnenschein (RGB, Deckkraft = Anteil) */
@@ -66,6 +67,7 @@
     --accent: #0a84ff;
     --shadow: none;
     --weekend: rgba(120,160,230,.10);
+    --rainp: #5aaeff;
     --trend-line: #4a4f55;
     --cell: #2c2c2e;
     --drop: #6aa7ee;
@@ -83,6 +85,7 @@
       --accent: #0a84ff;
       --shadow: none;
       --weekend: rgba(120,160,230,.10);
+      --rainp: #5aaeff;
       --trend-line: #4a4f55;
       --cell: #2c2c2e;
       --drop: #6aa7ee;
@@ -303,7 +306,8 @@
     transform: rotate(45deg); transition: transform .15s;
   }
   .settings[open] summary::after, .trend[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
-  .settings .opts { display: grid; gap: 2px; padding: 0 12px 10px; }
+  .settings .opts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 0 12px 10px; }
+  .controls > * { min-width: 0; } /* lange Auswahl-Texte dürfen die Spalte nicht über den Bildschirm drücken */
   .settings label { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; }
   .settings input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
   .settings label.sel { justify-content: space-between; }
@@ -313,7 +317,7 @@
   .settings .appver button { padding: 5px 12px; }
   .settings select {
     font: inherit; color: var(--text); background: var(--card);
-    border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; max-width: 60%;
+    border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; max-width: 60%; min-width: 0; text-overflow: ellipsis;
   }
   .settings small { color: var(--muted); }
   /* Handy im Hochformat: volle Breite ohne Seitenränder, Karten und Aufklapp-Felder randlos;
@@ -473,7 +477,7 @@
       <span><i class="band"></i>80% CI</span>
       <span>☀︎ viel <i class="sunbar"></i> wenig</span>
       <span><i class="bar" style="background:var(--rain-strong)"></i>Regen <i class="bar" style="background:var(--snow-strong)"></i>Schnee (Median)</span>
-      <span><b style="color:#0a5fc8">40%</b> Regenwahrscheinlichkeit (≥ 1 mm)</span>
+      <span><b style="color:var(--rainp)">40%</b> Regenwahrscheinlichkeit (≥ 1 mm)</span>
       <span>Median aus 51 Prognosen des ECMWF</span>
     </div>
   </details>
@@ -668,7 +672,7 @@
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      const [data, tj] = await Promise.all([r.json(), tideReq, loadKp()]);
+      const [data, tj] = await Promise.all([r.json(), tideReq]);
       if (seq !== loadSeq) return; // inzwischen anderer Ort/neuerer Abruf
       const th = tj && tj.hourly && tj.hourly.sea_level_height_msl;
       state.tide = th && th.some(v => v != null) ? { t: tj.hourly.time, h: th } : null;
@@ -680,6 +684,7 @@
       $('status').style.display = 'none';
       render();
       loadEns(force === true);
+      loadKp().then(ok => { if (ok && seq === loadSeq) render(); }); // NOAA unabhängig – bremst die Wetteranzeige nicht
     } catch (e) {
       if (seq !== loadSeq) return;
       $('status').textContent = 'Wetterdaten konnten nicht geladen werden (' + e.message + ').';
@@ -1221,15 +1226,19 @@
   // Kp-Index (Stärke des geomagnetischen Sturms, 0–9) der NOAA: gemessen + Vorhersage für 3 Tage in 3-h-Blöcken.
   // Gilt weltweit gleich → einmal laden, höchstens alle 3 h neu (≈ 7 KB, ohne Ortsangabe).
   const kp = { data: null, at: 0 };
+  // Liefert true, wenn neue Daten da sind (dann neu zeichnen)
   async function loadKp() {
-    if (!state.opts.aurora || Date.now() - kp.at < 3 * 3600e3) return;
+    if (!state.opts.aurora || Date.now() - kp.at < 3 * 3600e3) return false;
     kp.at = Date.now();
     try {
-      const r = await fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json');
+      const r = await fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json', AbortSignal.timeout ? { signal: AbortSignal.timeout(20000) } : {}); // timeout() erst ab iOS 16
       if (!r.ok) throw new Error();
-      kp.data = (await r.json()).filter(e => e && e.kp != null && e.time_tag)
+      const list = (await r.json()).filter(e => e && e.kp != null && e.time_tag)
         .map(e => ({ t: Date.parse(e.time_tag + 'Z') / 1000, kp: +e.kp, obs: e.observed }));
-    } catch { kp.at = Date.now() - 2.5 * 3600e3; } // Fehler: in 30 min erneut versuchen
+      if (!list.length) throw new Error();
+      kp.data = list;
+      return true;
+    } catch { kp.at = Date.now() - 2.5 * 3600e3; return false; } // Fehler: in 30 min erneut versuchen
   }
   const kpAt = t => { const b = kp.data && kp.data.find(e => t >= e.t && t < e.t + 3 * H); return b ? b.kp : null; };
   // Nötiger Kp, damit Polarlicht am Nordhorizont zu sehen ist – Faustregel für Europa:
@@ -1973,7 +1982,9 @@
       el('path', { d: monotonePath(vals.map((v, j) => [cx(j), yT(v)])), fill: 'none', stroke: css('--trend-line'), 'stroke-width': 1.5 }, svg);
       vals.forEach((v, j) => {
         el('circle', { cx: cx(j), cy: yT(v), r: small ? 2.5 : 3.5, fill: col }, svg);
-        const t = el('text', { x: cx(j), y: yT(v) + dy, 'text-anchor': 'middle', 'font-size': fs, fill: col }, svg);
+        // heller/dunkler Rand in Hintergrundfarbe → Zahl bleibt auf Regenbalken lesbar
+        const t = el('text', { x: cx(j), y: yT(v) + dy, 'text-anchor': 'middle', 'font-size': fs, fill: col,
+          stroke: css('--card'), 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke' }, svg);
         t.textContent = Math.round(v);
       });
     });
@@ -1986,7 +1997,8 @@
       el('rect', { x: j * cw + 0.5, y: y0, width: cw - 1, height: CELL, fill: `rgba(${css('--sun')},${(sunFrac * sunFrac).toFixed(2)})` }, svg); // quadratisch: nur wirklich sonnige Tage kräftig gelb
       // Regenwahrscheinlichkeit (Statistik): „40%“ in der Zeile, ab 10 %
       if (ser.rainP && ser.rainP[j] >= 0.1) {
-        const pt = el('text', { x: cx(j), y: y0 + CELL / 2 + 3.5, 'text-anchor': 'middle', 'font-size': small ? 9 : 10, 'font-weight': 600, fill: '#0a5fc8' }, svg);
+        const pt = el('text', { x: cx(j), y: y0 + CELL / 2 + 3.5, 'text-anchor': 'middle', 'font-size': small ? 9 : 10, 'font-weight': 600, fill: css('--rainp'),
+          stroke: css('--card'), 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'paint-order': 'stroke' }, svg);
         pt.textContent = Math.round(ser.rainP[j] * 10) * 10 + '%';
       }
     }
@@ -2237,7 +2249,7 @@
       store.set('opts', state.opts);
       // Tide eingeschaltet, aber noch nicht geladen → nachladen; sonst nur neu zeichnen
       if (cb.dataset.opt === 'tide' && cb.checked && !state.tide && !noTide.has(tideKey(state.loc))) load();
-      else if (cb.dataset.opt === 'aurora' && cb.checked && !kp.data) loadKp().then(render);
+      else if (cb.dataset.opt === 'aurora' && cb.checked && !kp.data) { render(); loadKp().then(ok => ok && render()); }
       else render();
     });
   });
