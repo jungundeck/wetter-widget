@@ -816,12 +816,18 @@
       $('radarSlider').max = radar.frames.length - 1;
       return;
     }
-    let end = Date.now() + 2 * 3600e3;
-    try {
-      const x = await (await fetch(RADAR_CAPS)).text();
-      const m = x.match(/<Dimension name="time"[^>]*>\s*[^<\/]+\/([^<\/]+)\//);
-      if (m) end = Date.parse(m[1]);
-    } catch {}
+    // Letzter Vorhersage-Zeitpunkt laut DWD. Der DWD verteilt Anfragen auf mehrere Server; ist einer davon
+    // hängen geblieben (z. B. Stand von vor Tagen), ist sein Enddatum unbrauchbar → 4 Abfragen gleichzeitig,
+    // der neueste plausible Wert gilt (höchstens 30 min alt, höchstens 3 h voraus), sonst Annahme +2 h.
+    const ends = await Promise.all([0, 1, 2, 3].map(async k => {
+      try {
+        const x = await (await fetch(RADAR_CAPS + '&_=' + Date.now() + k, { cache: 'no-store', ...(AbortSignal.timeout ? { signal: AbortSignal.timeout(10000) } : {}) })).text();
+        const m = x.match(/<Dimension name="time"[^>]*>\s*[^<\/]+\/([^<\/]+)\//);
+        return m ? Date.parse(m[1]) : NaN;
+      } catch { return NaN; }
+    }));
+    let end = Math.max(-Infinity, ...ends.filter(e => e > Date.now() - 30 * 60e3 && e < Date.now() + 3 * 3600e3));
+    if (!isFinite(end)) end = Date.now() + 2 * 3600e3;
     const nowR = Math.round(Date.now() / RADAR_STEP) * RADAR_STEP;
     radar.frames = [];
     for (let t = nowR - 2 * 3600e3; t <= end; t += RADAR_STEP) radar.frames.push(t);
@@ -901,14 +907,21 @@
       if (gen.mode === 'model') img.crossOrigin = 'anonymous'; // für das Umfärben per Canvas
       img.onload = async () => {
         if (radar.gen !== gen) return; // Ausschnitt inzwischen geändert
-        let src = u;
-        if (gen.mode === 'model') { try { src = (await modelRecolor(img)) || u; } catch {} }
+        let src = img.src;
+        if (gen.mode === 'model') { try { src = (await modelRecolor(img)) || img.src; } catch {} }
         if (radar.gen !== gen) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; }
         gen.srcs[i] = src;
         if (i === radar.idx) radarShow(i);
         radarProgress();
       };
-      img.onerror = () => { if (radar.gen === gen) { gen.srcs[i] = 'fehler'; if (i === radar.idx) radarShow(i); radarProgress(); } };
+      // Fehler: oft nur ein DWD-Server ohne aktuelle Daten → bis zu 6 Neuversuche (andere URL, damit der
+      // Browser die Fehlantwort nicht aus dem Zwischenspeicher nimmt und der Lastverteiler neu wählt)
+      let tries = 0;
+      img.onerror = () => {
+        if (radar.gen !== gen) return;
+        if (++tries <= 6) { setTimeout(() => { if (radar.gen === gen) img.src = u + '&_r=' + tries; }, 300 * tries); return; }
+        gen.srcs[i] = 'fehler'; if (i === radar.idx) radarShow(i); radarProgress();
+      };
       img.src = u;
     });
   }
@@ -932,6 +945,7 @@
     radar.nowIdx = radarNowIdx();
     radarNowMark();
     const t = radar.frames[i], d = Math.round((t - Date.now()) / 60000);
+    if (t == null) return; // keine Zeitpunkte (sollte nicht vorkommen) – nicht mit ungültiger Zeit formatieren
     const off = state.data ? state.data.utc_offset_seconds : 0;
     const st = radar.gen && radar.gen.srcs[i];
     const stamp = $('radarStamp');
