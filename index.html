@@ -2148,7 +2148,13 @@
     state.ens = null;
     $('ensStatus').textContent = 'Lade Statistik …';
     $('ensStatus').style.display = 'flex';
+    state.sst = null;
     $('name').textContent = loc.name;
+    // Werte des alten Orts sofort wegnehmen, bis die neuen Daten da sind (Grafikgröße bleibt, kein Springen)
+    $('curT').textContent = '–'; $('curH').textContent = '–'; $('elev').textContent = ':';
+    $('updated').textContent = 'Lade Daten …'; $('htip').hidden = true;
+    hideTip(); view = null; $('nowBtn').hidden = true;
+    ['svg', 'trendSvg', 'ensSvg'].forEach(id => $(id).replaceChildren());
     $('status').textContent = 'Lade Wetterdaten …';
     renderTabs();
     radarFollowLoc();
