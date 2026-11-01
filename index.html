@@ -169,6 +169,7 @@
   #radarMap { position: absolute; inset: 0; }
   #radarMap.leaflet-container { touch-action: pan-x pan-y !important; } /* ein Finger: Seite scrollen */
   .radarmap .status { z-index: 500; pointer-events: none; }
+  .basemap.osm { filter: grayscale(1) brightness(1.04) contrast(.92); } /* Ersatzkarte im Stil der grauen basemap.de */
   .rinfo { position: absolute; left: 8px; bottom: 8px; z-index: 600; display: flex; align-items: center; gap: 6px; pointer-events: none; }
   .rhint {
     position: absolute; inset: 0; z-index: 650; display: flex; align-items: center; justify-content: center;
@@ -601,7 +602,7 @@
         <li><b>Open-Meteo</b> (Schweiz) – Vorhersage, Tide, Wassertemperatur, Ortssuche (Suchbegriff)</li>
         <li><b>NOAA Space Weather Prediction Center</b> (USA) – Polarlicht-Vorhersage (Kp-Index); ohne Ortsangabe, abschaltbar</li>
         <li><b>Deutscher Wetterdienst</b> – Radarbilder (nur wenn das Regenradar geöffnet ist)</li>
-        <li><b>BKG / basemap.de</b> – Grundkarte des Radars</li>
+        <li><b>BKG / basemap.de</b> – Grundkarte des Radars (bei Ausfall ersatzweise <b>OpenStreetMap</b>)</li>
         <li><b>cdnjs (Cloudflare)</b> – Kartenbibliothek Leaflet (beim Öffnen des Radars)</li>
         <li><b>BigDataCloud</b> – Ortsname zu deinem Standort, nur wenn du auf ⌖ tippst; der Standort selbst wird nur nach deiner Freigabe im Browser ermittelt</li>
         <li><b>GitHub Pages</b> – stellt die Seite bereit (übliche Server-Protokolle)</li>
@@ -771,13 +772,32 @@
   const isDark = () => document.documentElement.dataset.theme === 'dark'
     || (document.documentElement.dataset.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
 
-  // Grundkarte: basemap.de (BKG, grau, frei nutzbar, deckt Deutschland ab wie das Radar)
+  // Grundkarte: basemap.de (BKG, grau, frei nutzbar, deckt Deutschland ab wie das Radar).
+  // Antwortet der BKG-Server nicht (z. B. 01.11.2026: Adresse zeigte auf einen stummen Server), kommt nach
+  // 8 s ohne Kachel bzw. nach 3 Fehlern ersatzweise OpenStreetMap in Grau; der Ausfall wird 6 h gemerkt.
+  const RADAR_ATTR = ' · Radar © <a href="https://www.dwd.de">DWD</a>';
+  function radarBaseFallback() {
+    if (radar.baseFallback) return;
+    radar.baseFallback = true;
+    store.set('basefail', Date.now());
+    if (radar.base) radar.map.removeLayer(radar.base);
+    radar.base = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 12, className: 'basemap osm',
+      attribution: 'Karte © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende' + RADAR_ATTR }).addTo(radar.map);
+  }
   function radarBaseTiles() {
     if (!radar.map) return;
     if (!radar.base) {
-      radar.base = L.tileLayer('https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_grau/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png', {
-        maxZoom: 12, className: 'basemap',
-        attribution: 'Karte © <a href="https://basemap.de">basemap.de / BKG</a> · Radar © <a href="https://www.dwd.de">DWD</a>' }).addTo(radar.map);
+      if (Date.now() - (store.get('basefail') || 0) < 6 * 3600e3) radarBaseFallback();
+      else {
+        let ok = false, errs = 0;
+        radar.base = L.tileLayer('https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_grau/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png', {
+          maxZoom: 12, className: 'basemap',
+          attribution: 'Karte © <a href="https://basemap.de">basemap.de / BKG</a>' + RADAR_ATTR }).addTo(radar.map);
+        radar.base.on('tileload', () => { ok = true; });
+        radar.base.on('tileerror', () => { if (!ok && ++errs >= 3) radarBaseFallback(); });
+        setTimeout(() => { if (!ok) radarBaseFallback(); }, 8000);
+      }
     }
     $('radarMap').classList.toggle('dark', isDark());
   }
